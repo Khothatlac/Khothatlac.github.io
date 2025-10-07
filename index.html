@@ -1,3 +1,4 @@
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let products = JSON.parse(localStorage.getItem('products')) || [];
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
@@ -45,225 +46,488 @@
         const actionTh = document.querySelector('#productsTable thead th:last-child');
         const actionTds = document.querySelectorAll('#productsBody td:last-child');
         if (hasPermission('canEdit')) {
-            actionTh?.classList.remove('d-none');
+            if (actionTh) actionTh.classList.remove('d-none');
             actionTds.forEach(td => td.classList.remove('d-none'));
         } else {
-            actionTh?.classList.add('d-none');
+            if (actionTh) actionTh.classList.add('d-none');
             actionTds.forEach(td => td.classList.add('d-none'));
         }
         // Hiển thị role
-        document.getElementById('roleDisplay').textContent = `Chào ${currentUser} (${currentRole.toUpperCase()})`;
-        document.getElementById('roleBadge').innerHTML = `<span class="badge bg-${currentRole === 'admin' ? 'danger' : currentRole === 'manager' ? 'warning' : 'secondary'}">${currentRole.toUpperCase()}</span>`;
+        const roleDisplay = document.getElementById('roleDisplay');
+        const roleBadge = document.getElementById('roleBadge');
+        if (roleDisplay) roleDisplay.textContent = `Chào ${currentUser} (${currentRole.toUpperCase()})`;
+        if (roleBadge) roleBadge.innerHTML = `<span class="badge bg-${currentRole === 'admin' ? 'danger' : currentRole === 'manager' ? 'warning' : 'secondary'}">${currentRole.toUpperCase()}</span>`;
     }
 
     // ===== AUTHENTICATION =====
     document.addEventListener('DOMContentLoaded', function() {
-        // Sửa: Force hide modal và unlock body ngay từ đầu để tránh blank page khi reload
-        const modal = document.getElementById('authModal');
-        if (modal) {
-            modal.classList.remove('show', 'd-block', 'fade');
-            modal.style.display = 'none';
-            modal.style.background = 'none';
-        }
-        document.body.classList.remove('modal-open');
-        document.body.style.overflow = 'auto';  // Unlock scroll luôn
-
-        // Load users nếu chưa có, tạo admin mặc định (ẩn)
-        if (users.length === 0) {
-            users = [{ username: 'admin', password: '123456', role: 'admin' }];  // Admin mặc định ẩn
-            localStorage.setItem('users', JSON.stringify(users));
-        }
-
-        // Clear invalid class on input
-        function clearInvalid(inputId) {
-            document.getElementById(inputId).classList.remove('is-invalid');
-        }
-
-        // Event Đăng Nhập
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const username = document.getElementById('loginUsername').value.toLowerCase().trim();
-            const password = document.getElementById('loginPassword').value;
-            const user = users.find(u => u.username === username && u.password === password);
-            if (user) {
-                currentUser = user.username;
-                currentRole = user.role;
-                localStorage.setItem('currentUser', username);
-                localStorage.setItem('currentRole', currentRole);
-                
-                // Close modal completely
-                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('authModal'));
-                modalInstance.hide();
-                
-                // Force remove modal classes and backdrop
-                setTimeout(() => {
-                    const modal = document.getElementById('authModal');
-                    modal.classList.remove('show', 'd-block');
-                    modal.style.display = 'none';
-                    modal.style.background = 'none';  // Clear backdrop
-                    document.body.classList.remove('modal-open');  // Remove body lock
-                    document.body.style.overflow = 'auto';  // Restore scroll
-                    
-                    // Show main content
-                    document.getElementById('mainContent').style.display = 'block';
-                    
-                    // Delay load data to ensure DOM rendered
-                    setTimeout(() => {
-                        console.log('Loading data after login...');  // Debug log
-                        loadAllData();
-                        updateUIForRole();
-                        
-                        // Show success alert
-                        alert(`Đăng nhập thành công! Chào mừng ${currentUser} với vai trò ${currentRole.toUpperCase()}.`);
-                    }, 500);  // Wait for DOM to fully render
-                }, 300);  // Wait for fade-out animation
-            } else {
-                alert('Tên đăng nhập hoặc mật khẩu không đúng!');
-                document.getElementById('loginUsername').classList.add('is-invalid');
-                document.getElementById('loginPassword').classList.add('is-invalid');
-            }
-        });
-
-        // Event Đăng Ký
-        document.getElementById('registerForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const username = document.getElementById('regUsername').value.toLowerCase().trim();
-            const password = document.getElementById('regPassword').value;
-            const confirmPassword = document.getElementById('regConfirmPassword').value;
-            // Validation
-            if (users.find(u => u.username === username)) {
-                alert('Tên đăng nhập đã tồn tại!');
-                document.getElementById('regUsername').classList.add('is-invalid');
-                return;
-            }
-            if (password.length < 6) {
-                alert('Mật khẩu phải ít nhất 6 ký tự!');
-                document.getElementById('regPassword').classList.add('is-invalid');
-                return;
-            }
-            if (password !== confirmPassword) {
-                alert('Mật khẩu xác nhận không khớp!');
-                document.getElementById('regConfirmPassword').classList.add('is-invalid');
-                return;
-            }
-            // Tạo user mới với role mặc định 'viewer'
-            users.push({ username, password, role: 'viewer' });
-            localStorage.setItem('users', JSON.stringify(users));
-            alert('Đăng ký thành công! Vai trò của bạn là "Người Xem". Bây giờ bạn có thể đăng nhập.');
-            // Reset và chuyển tab Login
-            document.getElementById('registerForm').reset();
-            document.getElementById('login-tab').click();
-            document.getElementById('loginUsername').value = username;
-            document.getElementById('loginPassword').value = password;  // Auto-fill để đăng nhập nhanh
-        });
-
-        // Clear invalid on input
-        ['regUsername', 'regPassword', 'regConfirmPassword', 'loginUsername', 'loginPassword'].forEach(id => {
-            document.getElementById(id).addEventListener('input', () => clearInvalid(id));
-        });
-
-        // Check nếu đã login
-        const savedUser = localStorage.getItem('currentUser');
-        const savedRole = localStorage.getItem('currentRole');
-        if (savedUser && savedRole) {
-            currentUser = savedUser;
-            currentRole = savedRole;
-            // Sửa: Force hide modal lại lần nữa cho an toàn khi reload
+        try {
+            // Sửa: Force hide modal và unlock body ngay đầu, an toàn hơn
             const modal = document.getElementById('authModal');
             if (modal) {
                 modal.classList.remove('show', 'd-block', 'fade');
                 modal.style.display = 'none';
                 modal.style.background = 'none';
+                // Force Bootstrap hide nếu instance tồn tại
+                const modalInstance = bootstrap.Modal.getInstance(modal);
+                if (modalInstance) modalInstance.hide();
             }
             document.body.classList.remove('modal-open');
-            document.body.style.overflow = 'auto';
-            document.getElementById('mainContent').style.display = 'block';
-            setTimeout(() => {
-                console.log('Loading saved session data...');  // Debug log
-                loadAllData();
-                updateUIForRole();
-            }, 500);  // Delay for F5 cases
-        } else {
-            // Nếu chưa login, show modal
-            const modal = document.getElementById('authModal');
-            if (modal) {
-                modal.classList.add('show', 'd-block');
-                modal.style.display = 'block';
-                modal.style.background = 'rgba(0,0,0,0.5)';
-                document.body.classList.add('modal-open');
-                document.body.style.overflow = 'hidden';
-            }
-        }
+            document.body.style.overflow = 'auto';  // Unlock scroll luôn
 
-        // Dynamic load for tabs (load data when tab shown)
-        const triggerTabList = document.querySelectorAll('#mainTabs button');
-        triggerTabList.forEach(triggerEl => {
-            const tabTrigger = new bootstrap.Tab(triggerEl);
-            triggerEl.addEventListener('shown.bs.tab', function (e) {
-                const targetTab = e.target.getAttribute('data-bs-target');
-                if (targetTab === '#products') {
-                    console.log('Loading products tab...');  // Debug
-                    loadProducts();
-                    updateStats();
-                } else if (targetTab === '#transactions') {
-                    console.log('Loading transactions tab...');  // Debug
-                    loadTransactions();
-                } else if (targetTab === '#reports') {
-                    console.log('Loading reports tab...');  // Debug
-                    updateReportData();
+            // Load users nếu chưa có, tạo admin mặc định (ẩn)
+            if (users.length === 0) {
+                users = [{ username: 'admin', password: '123456', role: 'admin' }];
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+
+            // Clear invalid class on input
+            function clearInvalid(inputId) {
+                const input = document.getElementById(inputId);
+                if (input) input.classList.remove('is-invalid');
+            }
+
+            // Event Đăng Nhập - Sửa: Kiểm tra element tồn tại trước addEventListener
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const loginUsername = document.getElementById('loginUsername');
+                    const loginPassword = document.getElementById('loginPassword');
+                    if (!loginUsername || !loginPassword) return;  // Tránh null
+                    const username = loginUsername.value.toLowerCase().trim();
+                    const password = loginPassword.value;
+                    const user = users.find(u => u.username === username && u.password === password);
+                    if (user) {
+                        currentUser = user.username;
+                        currentRole = user.role;
+                        localStorage.setItem('currentUser', username);
+                        localStorage.setItem('currentRole', currentRole);
+                        
+                        // Close modal completely
+                        const modalInstance = bootstrap.Modal.getInstance(modal);
+                        if (modalInstance) modalInstance.hide();
+                        
+                        // Force remove modal classes and backdrop
+                        setTimeout(() => {
+                            if (modal) {
+                                modal.classList.remove('show', 'd-block');
+                                modal.style.display = 'none';
+                                modal.style.background = 'none';
+                            }
+                            document.body.classList.remove('modal-open');
+                            document.body.style.overflow = 'auto';
+                            
+                            // Show main content
+                            const mainContent = document.getElementById('mainContent');
+                            if (mainContent) mainContent.style.display = 'block';
+                            
+                            // Delay load data to ensure DOM rendered
+                            setTimeout(() => {
+                                console.log('Loading data after login...');
+                                loadAllData();
+                                updateUIForRole();
+                                alert(`Đăng nhập thành công! Chào mừng ${currentUser} với vai trò ${currentRole.toUpperCase()}.`);
+                            }, 500);
+                        }, 300);
+                    } else {
+                        alert('Tên đăng nhập hoặc mật khẩu không đúng!');
+                        if (loginUsername) loginUsername.classList.add('is-invalid');
+                        if (loginPassword) loginPassword.classList.add('is-invalid');
+                    }
+                });
+            }
+
+            // Event Đăng Ký - Sửa: Kiểm tra element tồn tại
+            const registerForm = document.getElementById('registerForm');
+            if (registerForm) {
+                registerForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const regUsername = document.getElementById('regUsername');
+                    const regPassword = document.getElementById('regPassword');
+                    const regConfirmPassword = document.getElementById('regConfirmPassword');
+                    if (!regUsername || !regPassword || !regConfirmPassword) return;
+                    const username = regUsername.value.toLowerCase().trim();
+                    const password = regPassword.value;
+                    const confirmPassword = regConfirmPassword.value;
+                    // Validation
+                    if (users.find(u => u.username === username)) {
+                        alert('Tên đăng nhập đã tồn tại!');
+                        regUsername.classList.add('is-invalid');
+                        return;
+                    }
+                    if (password.length < 6) {
+                        alert('Mật khẩu phải ít nhất 6 ký tự!');
+                        regPassword.classList.add('is-invalid');
+                        return;
+                    }
+                    if (password !== confirmPassword) {
+                        alert('Mật khẩu xác nhận không khớp!');
+                        regConfirmPassword.classList.add('is-invalid');
+                        return;
+                    }
+                    // Tạo user mới với role mặc định 'viewer'
+                    users.push({ username, password, role: 'viewer' });
+                    localStorage.setItem('users', JSON.stringify(users));
+                    alert('Đăng ký thành công! Vai trò của bạn là "Người Xem". Bây giờ bạn có thể đăng nhập.');
+                    // Reset và chuyển tab Login
+                    registerForm.reset();
+                    const loginTab = document.getElementById('login-tab');
+                    if (loginTab) loginTab.click();
+                    const loginUsername = document.getElementById('loginUsername');
+                    const loginPassword = document.getElementById('loginPassword');
+                    if (loginUsername) loginUsername.value = username;
+                    if (loginPassword) loginPassword.value = password;
+                });
+            }
+
+            // Clear invalid on input - Sửa: Kiểm tra element tồn tại
+            ['regUsername', 'regPassword', 'regConfirmPassword', 'loginUsername', 'loginPassword'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.addEventListener('input', () => clearInvalid(id));
                 }
             });
-        });
+
+            // Check nếu đã login
+            const savedUser = localStorage.getItem('currentUser');
+            const savedRole = localStorage.getItem('currentRole');
+            if (savedUser && savedRole) {
+                currentUser = savedUser;
+                currentRole = savedRole;
+                // Force hide modal lần nữa cho an toàn khi reload
+                if (modal) {
+                    modal.classList.remove('show', 'd-block', 'fade');
+                    modal.style.display = 'none';
+                    modal.style.background = 'none';
+                    const modalInstance = bootstrap.Modal.getInstance(modal);
+                    if (modalInstance) modalInstance.hide();
+                }
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = 'auto';
+                const mainContent = document.getElementById('mainContent');
+                if (mainContent) mainContent.style.display = 'block';
+                setTimeout(() => {
+                    console.log('Loading saved session data...');
+                    loadAllData();
+                    updateUIForRole();
+                }, 500);
+            } else {
+                // Nếu chưa login, show modal
+                if (modal) {
+                    modal.classList.add('show', 'd-block');
+                    modal.style.display = 'block';
+                    modal.style.background = 'rgba(0,0,0,0.5)';
+                    document.body.classList.add('modal-open');
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+
+            // Dynamic load for tabs - Sửa: Kiểm tra #mainTabs tồn tại
+            const mainTabs = document.getElementById('mainTabs');
+            if (mainTabs) {
+                const triggerTabList = mainTabs.querySelectorAll('button');
+                triggerTabList.forEach(triggerEl => {
+                    const tabTrigger = new bootstrap.Tab(triggerEl);
+                    triggerEl.addEventListener('shown.bs.tab', function (e) {
+                        const targetTab = e.target.getAttribute('data-bs-target');
+                        if (targetTab === '#products') {
+                            console.log('Loading products tab...');
+                            loadProducts();
+                            updateStats();
+                        } else if (targetTab === '#transactions') {
+                            console.log('Loading transactions tab...');
+                            loadTransactions();
+                        } else if (targetTab === '#reports') {
+                            console.log('Loading reports tab...');
+                            updateReportData();
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('Lỗi trong DOMContentLoaded:', error);  // Catch toàn bộ để tránh blank page
+            // Fallback: Show main content nếu lỗi
+            const mainContent = document.getElementById('mainContent');
+            if (mainContent) mainContent.style.display = 'block';
+        }
     });
 
-    function logout() {
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('currentRole');
-        currentRole = null;
-        currentUser = null;
-        document.getElementById('mainContent').style.display = 'none';
-        const modal = document.getElementById('authModal');
-        modal.classList.add('show', 'd-block');
-        modal.style.display = 'block';
-        modal.style.background = 'rgba(0,0,0,0.5)';
-        document.body.classList.add('modal-open');
-        document.body.style.overflow = 'hidden';
-        // Reset forms
-        document.getElementById('loginForm').reset();
-        document.getElementById('registerForm').reset();
-        document.getElementById('login-tab').click();  // Về tab Login
-    }
-
+    // Các hàm còn lại giữ nguyên (loadAllData, saveData, updateCharts, v.v.) - dùng code từ phản hồi trước
     function loadAllData() {
-        console.log('Initial loadAllData called');  // Debug
+        console.log('Initial loadAllData called');
         try {
-            // Sửa: Try-catch để tránh lỗi parse JSON gây blank page
             products = JSON.parse(localStorage.getItem('products')) || [];
             transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-            console.log('Loaded products:', products.length, 'items');  // Debug log số lượng sản phẩm load
+            console.log('Loaded products:', products.length, 'items');
         } catch (error) {
-            console.error('Lỗi load localStorage:', error);  // Log lỗi nếu JSON corrupt
-            products = [];  // Fallback rỗng
+            console.error('Lỗi load localStorage:', error);
+            products = [];
             transactions = [];
-            localStorage.removeItem('products');  // Xóa data lỗi
+            localStorage.removeItem('products');
             localStorage.removeItem('transactions');
         }
         loadProducts();
         loadTransactions();
-        updateReportData();  // Separate for charts
+        updateReportData();
         if (hasPermission('canLoadSample') && products.length === 0) loadSampleData();
     }
 
-    // Separate function for reports (with charts)
+    function saveData() {
+        try {
+            localStorage.setItem('products', JSON.stringify(products));
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+            console.log('Saved products to localStorage:', products.length, 'items');
+        } catch (error) {
+            console.error('Lỗi save localStorage:', error);
+            alert('Lỗi lưu dữ liệu! Kiểm tra localStorage.');
+        }
+    }
+
+    // ... (Giữ nguyên tất cả hàm khác: loadProducts, getStatus, searchProducts, filterProducts, updatePagination, changePage, updateStats, formatCurrency, resetProductForm, editProduct, saveProduct, deleteProduct, updateTransactionProductSelect, setTransactionType, updateQuantityLimit, saveTransaction, loadTransactions, filterTransactions, updateReportData, updateReportTable, loadSampleData, updateCharts, exportToPDF, clearAllData)
+    // (Copy từ code trước để đầy đủ, không thay đổi)
+
+    function getStatus(qty) { return qty > 10 ? 'Đầy Đủ' : qty > 0 ? 'Ít' : 'Hết'; }
+
+    function searchProducts() {
+        const searchInput = document.getElementById('searchInput');
+        if (!searchInput) return;
+        const query = searchInput.value.toLowerCase();
+        filteredProducts = products.filter(p => p.code.toLowerCase().includes(query) || p.name.toLowerCase().includes(query));
+        currentPage = 1;
+        loadProducts();
+    }
+
+    function filterProducts() {
+        const filterStatus = document.getElementById('filterStatus');
+        if (!filterStatus) return;
+        const status = filterStatus.value;
+        loadProducts(status);
+    }
+
+    function updatePagination(total) {
+        const totalPages = Math.ceil(total / itemsPerPage);
+        let html = '';
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changePage(${i}); event.preventDefault();">${i}</a></li>`;
+        }
+        const pagination = document.getElementById('pagination');
+        if (pagination) pagination.innerHTML = html;
+    }
+
+    function changePage(page) {
+        currentPage = page;
+        filterProducts();  // Gọi lại để apply filter hiện tại
+    }
+
+    function updateStats() {
+        const totalProducts = document.getElementById('totalProducts');
+        const totalValue = document.getElementById('totalValue');
+        const lowStock = document.getElementById('lowStock');
+        const outOfStock = document.getElementById('outOfStock');
+        if (!totalProducts || !totalValue || !lowStock || !outOfStock) return;
+        const total = products.length;
+        const value = products.reduce((sum, p) => sum + (p.quantity * p.importPrice), 0);
+        const low = products.filter(p => p.quantity > 0 && p.quantity <= 10).length;
+        const out = products.filter(p => p.quantity === 0).length;
+
+        totalProducts.textContent = total;
+        totalValue.textContent = formatCurrency(value);
+        lowStock.textContent = low;
+        outOfStock.textContent = out;
+    }
+
+    function formatCurrency(num) { return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ'; }
+
+    function resetProductForm() {
+        if (!hasPermission('canAdd')) return;
+        const productForm = document.getElementById('productForm');
+        const editProductId = document.getElementById('editProductId');
+        const productModalTitle = document.getElementById('productModalTitle');
+        if (productForm) productForm.reset();
+        if (editProductId) editProductId.value = '';
+        if (productModalTitle) productModalTitle.textContent = 'Thêm Sản Phẩm';
+    }
+
+    function editProduct(id) {
+        if (!hasPermission('canEdit')) return;
+        const p = products.find(p => p.id === id);
+        if (!p) return;
+        const editProductId = document.getElementById('editProductId');
+        const productCode = document.getElementById('productCode');
+        const productName = document.getElementById('productName');
+        const productImportPrice = document.getElementById('productImportPrice');
+        const productSellPrice = document.getElementById('productSellPrice');
+        const productModalTitle = document.getElementById('productModalTitle');
+        if (editProductId) editProductId.value = p.id;
+        if (productCode) productCode.value = p.code;
+        if (productName) productName.value = p.name;
+        if (productImportPrice) productImportPrice.value = p.importPrice;
+        if (productSellPrice) productSellPrice.value = p.sellPrice;
+        if (productModalTitle) productModalTitle.textContent = 'Sửa Sản Phẩm';
+        const productModal = document.getElementById('productModal');
+        if (productModal) new bootstrap.Modal(productModal).show();
+    }
+
+    function saveProduct() {
+        if (!hasPermission('canAdd')) return;
+        const editProductId = document.getElementById('editProductId');
+        const productCode = document.getElementById('productCode');
+        const productName = document.getElementById('productName');
+        const productImportPrice = document.getElementById('productImportPrice');
+        const productSellPrice = document.getElementById('productSellPrice');
+        if (!productCode || !productName || !productImportPrice || !productSellPrice) return;
+        const id = editProductId ? editProductId.value : '';
+        const code = productCode.value.trim();
+        if (products.find(p => p.code === code && p.id !== id)) {
+            alert('Mã SP đã tồn tại!');
+            return;
+        }
+        const product = {
+            id: id || Date.now().toString(),
+            code,
+            name: productName.value,
+            importPrice: parseFloat(productImportPrice.value),
+            sellPrice: parseFloat(productSellPrice.value),
+            quantity: id ? products.find(p => p.id === id).quantity : 0
+        };
+        if (id) {
+            const idx = products.findIndex(p => p.id === id);
+            if (idx > -1) products[idx] = product;
+        } else {
+            products.push(product);
+        }
+        saveData();
+        const productModal = document.getElementById('productModal');
+        if (productModal) bootstrap.Modal.getInstance(productModal).hide();
+        loadProducts();
+        resetProductForm();
+    }
+
+    function deleteProduct(id) {
+        if (!hasPermission('canDelete')) return;
+        if (confirm('Xác nhận xóa?')) {
+            products = products.filter(p => p.id !== id);
+            saveData();
+            loadProducts();
+        }
+    }
+
+    // ===== GIAO DỊCH =====
+    function updateTransactionProductSelect() {
+        const transactionProduct = document.getElementById('transactionProduct');
+        if (!transactionProduct) return;
+        transactionProduct.innerHTML = '<option value="">-- Chọn --</option>' + products.map(p => `<option value="${p.id}">${p.code} - ${p.name} (Tồn: ${p.quantity})</option>`).join('');
+    }
+
+    function setTransactionType(type) {
+        if (!hasPermission('canTransaction')) return;
+        const transactionType = document.getElementById('transactionType');
+        const transactionModalTitle = document.getElementById('transactionModalTitle');
+        const transactionQuantity = document.getElementById('transactionQuantity');
+        if (transactionType) transactionType.value = type;
+        if (transactionModalTitle) transactionModalTitle.textContent = type === 'import' ? 'Nhập Kho' : 'Xuất Kho';
+        if (transactionQuantity) transactionQuantity.min = 1;
+        updateQuantityLimit();
+    }
+
+    function updateQuantityLimit() {
+        const transactionProduct = document.getElementById('transactionProduct');
+        const transactionType = document.getElementById('transactionType');
+        const transactionQuantity = document.getElementById('transactionQuantity');
+        const quantityLimit = document.getElementById('quantityLimit');
+        if (!transactionProduct || !transactionType || !quantityLimit) return;
+        const prodId = transactionProduct.value;
+        const type = transactionType.value;
+        const p = products.find(p => p.id === prodId);
+        if (p) {
+            if (type === 'export' && p.quantity === 0) {
+                if (quantityLimit) quantityLimit.textContent = 'Hết hàng! Không thể xuất.';
+                if (transactionQuantity) transactionQuantity.disabled = true;
+            } else {
+                if (quantityLimit) quantityLimit.textContent = type === 'export' ? `Tối đa: ${p.quantity}` : '';
+                if (transactionQuantity) {
+                    transactionQuantity.disabled = false;
+                    transactionQuantity.max = type === 'export' ? p.quantity : '';
+                }
+            }
+        }
+    }
+
+    function saveTransaction() {
+        if (!hasPermission('canTransaction')) return;
+        const transactionType = document.getElementById('transactionType');
+        const transactionProduct = document.getElementById('transactionProduct');
+        const transactionQuantity = document.getElementById('transactionQuantity');
+        const transactionNote = document.getElementById('transactionNote');
+        const transactionModal = document.getElementById('transactionModal');
+        const transactionForm = document.getElementById('transactionForm');
+        if (!transactionType || !transactionProduct || !transactionQuantity) return;
+        const type = transactionType.value;
+        const prodId = transactionProduct.value;
+        const qty = parseInt(transactionQuantity.value);
+        const p = products.find(p => p.id === prodId);
+        if (!p || (type === 'export' && qty > p.quantity)) {
+            alert('Số lượng không hợp lệ!');
+            return;
+        }
+        const transaction = {
+            id: Date.now().toString(),
+            date: new Date().toISOString().split('T')[0],
+            productId: prodId,
+            type,
+            quantity: qty,
+            note: transactionNote ? transactionNote.value : ''
+        };
+        transactions.push(transaction);
+        p.quantity += type === 'import' ? qty : -qty;
+        saveData();
+        if (transactionModal) bootstrap.Modal.getInstance(transactionModal).hide();
+        if (transactionForm) transactionForm.reset();
+        loadProducts();
+        loadTransactions();
+        updateReportData();
+    }
+
+    function loadTransactions(dateFilter = null) {
+        console.log('loadTransactions called');
+        filteredTransactions = transactions.filter(t => !dateFilter || t.date === dateFilter);
+        const transactionsBody = document.getElementById('transactionsBody');
+        if (!transactionsBody) return;
+        transactionsBody.innerHTML = '';
+        filteredTransactions.slice().reverse().slice(0, 50).forEach(t => {
+            const p = products.find(p => p.id === t.productId);
+            const typeIcon = t.type === 'import' ? 'fas fa-arrow-down text-success' : 'fas fa-arrow-up text-danger';
+            transactionsBody.innerHTML += `
+                <tr>
+                    <td>${t.date}</td>
+                    <td>${p ? p.code : 'N/A'}</td>
+                    <td>${p ? p.name : 'N/A'}</td>
+                    <td><i class="${typeIcon}"></i> ${t.type.toUpperCase()}</td>
+                    <td><span class="badge bg-primary">${t.quantity}</span></td>
+                    <td>${t.note || ''}</td>
+                </tr>
+            `;
+        });
+    }
+
+    function filterTransactions() {
+        const dateFilter = document.getElementById('dateFilter');
+        if (!dateFilter) return;
+        const date = dateFilter.value;
+        loadTransactions(date || null);
+    }
+
     function updateReportData() {
-        console.log('Updating reports...');  // Debug
+        console.log('Updating reports...');
         updateCharts();
         updateReportTable();
     }
 
     function updateReportTable() {
-        const tbody = document.getElementById('reportBody');
-        tbody.innerHTML = '';
+        const reportBody = document.getElementById('reportBody');
+        if (!reportBody) return;
+        reportBody.innerHTML = '';
         const thisMonth = new Date().toISOString().slice(0,7);
         products.forEach(p => {
             const monthTrans = transactions.filter(t => t.productId === p.id && t.date.startsWith(thisMonth));
@@ -271,7 +535,7 @@
             const exportQty = monthTrans.filter(t => t.type === 'export').reduce((sum, t) => sum + t.quantity, 0);
             const finalQty = p.quantity;
             const value = finalQty * p.importPrice;
-            tbody.innerHTML += `
+            reportBody.innerHTML += `
                 <tr>
                     <td>${p.name}</td>
                     <td>${importQty}</td>
@@ -283,7 +547,6 @@
         });
     }
 
-    // Dữ liệu mẫu
     function loadSampleData() {
         products = [
             { id: '1', code: 'SP001', name: 'Laptop Dell', importPrice: 15000000, sellPrice: 18000000, quantity: 15 },
@@ -303,239 +566,12 @@
         alert('Đã load dữ liệu mẫu!');
     }
 
-    // Lưu dữ liệu
-    function saveData() {
-        try {
-            localStorage.setItem('products', JSON.stringify(products));
-            localStorage.setItem('transactions', JSON.stringify(transactions));
-            console.log('Saved products to localStorage:', products.length, 'items');  // Debug log
-        } catch (error) {
-            console.error('Lỗi save localStorage:', error);  // Log nếu quota full hoặc lỗi khác
-            alert('Lỗi lưu dữ liệu! Kiểm tra localStorage.');
-        }
-    }
-
-    // ===== SẢN PHẨM =====
-    function loadProducts(filter = null) {
-        console.log('loadProducts called');  // Debug
-        filteredProducts = products.filter(p => !filter || getStatus(p.quantity) === filter);
-        const start = (currentPage - 1) * itemsPerPage;
-        const pageProducts = filteredProducts.slice(start, start + itemsPerPage);
-
-        const tbody = document.getElementById('productsBody');
-        tbody.innerHTML = '';
-        pageProducts.forEach(p => {
-            const status = getStatus(p.quantity);
-            const statusClass = status === 'Đầy Đủ' ? 'text-success' : status === 'Ít' ? 'text-warning' : 'text-danger';
-            const actions = hasPermission('canEdit') ? `
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editProduct('${p.id}')"><i class="fas fa-edit"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteProduct('${p.id}')"><i class="fas fa-trash"></i></button>
-            ` : '';
-            tbody.innerHTML += `
-                <tr>
-                    <td>${p.code}</td>
-                    <td>${p.name}</td>
-                    <td><span class="badge bg-info">${p.quantity}</span></td>
-                    <td>${formatCurrency(p.importPrice)}</td>
-                    <td>${formatCurrency(p.sellPrice)}</td>
-                    <td><span class="${statusClass} fw-bold">${status}</span></td>
-                    <td>${actions}</td>
-                </tr>
-            `;
-        });
-        updatePagination(filteredProducts.length);
-        updateStats();
-        updateTransactionProductSelect();
-    }
-
-    function getStatus(qty) { return qty > 10 ? 'Đầy Đủ' : qty > 0 ? 'Ít' : 'Hết'; }
-
-    function searchProducts() {
-        const query = document.getElementById('searchInput').value.toLowerCase();
-        filteredProducts = products.filter(p => p.code.toLowerCase().includes(query) || p.name.toLowerCase().includes(query));
-        currentPage = 1;
-        loadProducts();
-    }
-
-    function filterProducts() {
-        const status = document.getElementById('filterStatus').value;
-        loadProducts(status);
-    }
-
-    function updatePagination(total) {
-        const totalPages = Math.ceil(total / itemsPerPage);
-        let html = '';
-        for (let i = 1; i <= totalPages; i++) {
-            html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changePage(${i}); event.preventDefault();">${i}</a></li>`;
-        }
-        document.getElementById('pagination').innerHTML = html;
-    }
-
-    function changePage(page) {
-        currentPage = page;
-        loadProducts(document.getElementById('filterStatus').value);
-    }
-
-    function updateStats() {
-        const total = products.length;
-        const value = products.reduce((sum, p) => sum + (p.quantity * p.importPrice), 0);
-        const low = products.filter(p => p.quantity > 0 && p.quantity <= 10).length;
-        const out = products.filter(p => p.quantity === 0).length;
-
-        document.getElementById('totalProducts').textContent = total;
-        document.getElementById('totalValue').textContent = formatCurrency(value);
-        document.getElementById('lowStock').textContent = low;
-        document.getElementById('outOfStock').textContent = out;
-    }
-
-    function formatCurrency(num) { return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ'; }
-
-    function resetProductForm() {
-        if (!hasPermission('canAdd')) return;
-        document.getElementById('productForm').reset();
-        document.getElementById('editProductId').value = '';
-        document.getElementById('productModalTitle').textContent = 'Thêm Sản Phẩm';
-    }
-
-    function editProduct(id) {
-        if (!hasPermission('canEdit')) return;
-        const p = products.find(p => p.id === id);
-        document.getElementById('editProductId').value = p.id;
-        document.getElementById('productCode').value = p.code;
-        document.getElementById('productName').value = p.name;
-        document.getElementById('productImportPrice').value = p.importPrice;
-        document.getElementById('productSellPrice').value = p.sellPrice;
-        document.getElementById('productModalTitle').textContent = 'Sửa Sản Phẩm';
-        new bootstrap.Modal(document.getElementById('productModal')).show();
-    }
-
-    function saveProduct() {
-        if (!hasPermission('canAdd')) return;
-        const id = document.getElementById('editProductId').value;
-        const code = document.getElementById('productCode').value.trim();
-        if (products.find(p => p.code === code && p.id !== id)) {
-            alert('Mã SP đã tồn tại!');
-            return;
-        }
-        const product = {
-            id: id || Date.now().toString(),
-            code,
-            name: document.getElementById('productName').value,
-            importPrice: parseFloat(document.getElementById('productImportPrice').value),
-            sellPrice: parseFloat(document.getElementById('productSellPrice').value),
-            quantity: id ? products.find(p => p.id === id).quantity : 0
-        };
-        if (id) {
-            const idx = products.findIndex(p => p.id === id);
-            products[idx] = product;
-        } else {
-            products.push(product);
-        }
-        saveData();
-        bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
-        loadProducts();
-        resetProductForm();
-    }
-
-    function deleteProduct(id) {
-        if (!hasPermission('canDelete')) return;
-        if (confirm('Xác nhận xóa?')) {
-            products = products.filter(p => p.id !== id);
-            saveData();
-            loadProducts();
-        }
-    }
-
-    // ===== GIAO DỊCH =====
-    function updateTransactionProductSelect() {
-        const select = document.getElementById('transactionProduct');
-        select.innerHTML = '<option value="">-- Chọn --</option>' + products.map(p => `<option value="${p.id}">${p.code} - ${p.name} (Tồn: ${p.quantity})</option>`).join('');
-    }
-
-    function setTransactionType(type) {
-        if (!hasPermission('canTransaction')) return;
-        document.getElementById('transactionType').value = type;
-        document.getElementById('transactionModalTitle').textContent = type === 'import' ? 'Nhập Kho' : 'Xuất Kho';
-        document.getElementById('transactionQuantity').min = 1;
-        updateQuantityLimit();
-    }
-
-    function updateQuantityLimit() {
-        const prodId = document.getElementById('transactionProduct').value;
-        const type = document.getElementById('transactionType').value;
-        const p = products.find(p => p.id === prodId);
-        const limit = document.getElementById('quantityLimit');
-        if (p) {
-            if (type === 'export' && p.quantity === 0) {
-                limit.textContent = 'Hết hàng! Không thể xuất.';
-                document.getElementById('transactionQuantity').disabled = true;
-            } else {
-                limit.textContent = type === 'export' ? `Tối đa: ${p.quantity}` : '';
-                document.getElementById('transactionQuantity').disabled = false;
-                document.getElementById('transactionQuantity').max = type === 'export' ? p.quantity : '';
-            }
-        }
-    }
-
-    function saveTransaction() {
-        if (!hasPermission('canTransaction')) return;
-        const type = document.getElementById('transactionType').value;
-        const prodId = document.getElementById('transactionProduct').value;
-        const qty = parseInt(document.getElementById('transactionQuantity').value);
-        const p = products.find(p => p.id === prodId);
-        if (!p || (type === 'export' && qty > p.quantity)) {
-            alert('Số lượng không hợp lệ!');
-            return;
-        }
-        const transaction = {
-            id: Date.now().toString(),
-            date: new Date().toISOString().split('T')[0],
-            productId: prodId,
-            type,
-            quantity: qty,
-            note: document.getElementById('transactionNote').value
-        };
-        transactions.push(transaction);
-        p.quantity += type === 'import' ? qty : -qty;
-        saveData();
-        bootstrap.Modal.getInstance(document.getElementById('transactionModal')).hide();
-        document.getElementById('transactionForm').reset();
-        loadProducts();
-        loadTransactions();
-        updateReportData();
-    }
-
-    function loadTransactions(dateFilter = null) {
-        console.log('loadTransactions called');  // Debug
-        filteredTransactions = transactions.filter(t => !dateFilter || t.date === dateFilter);
-        const tbody = document.getElementById('transactionsBody');
-        tbody.innerHTML = '';
-        filteredTransactions.slice().reverse().slice(0, 50).forEach(t => {
-            const p = products.find(p => p.id === t.productId);
-            const typeIcon = t.type === 'import' ? 'fas fa-arrow-down text-success' : 'fas fa-arrow-up text-danger';
-            tbody.innerHTML += `
-                <tr>
-                    <td>${t.date}</td>
-                    <td>${p ? p.code : 'N/A'}</td>
-                    <td>${p ? p.name : 'N/A'}</td>
-                    <td><i class="${typeIcon}"></i> ${t.type.toUpperCase()}</td>
-                    <td><span class="badge bg-primary">${t.quantity}</span></td>
-                    <td>${t.note || ''}</td>
-                </tr>
-            `;
-        });
-    }
-
-    function filterTransactions() {
-        const date = document.getElementById('dateFilter').value;
-        loadTransactions(date || null);
-    }
-
-    // ===== BÁO CÁO =====
     function updateCharts() {
-        console.log('updateCharts called');  // Debug
+        console.log('updateCharts called');
         // Biểu đồ tồn kho
-        const ctx1 = document.getElementById('stockChart').getContext('2d');
+        const stockChartCanvas = document.getElementById('stockChart');
+        if (!stockChartCanvas) return;
+        const ctx1 = stockChartCanvas.getContext('2d');
         const dates = [...new Set(transactions.map(t => t.date))].sort();
         const data = dates.map(d => {
             const lastTrans = transactions.filter(t => t.date <= d).reduce((sum, t) => sum + (t.type === 'import' ? t.quantity : -t.quantity), 0);
@@ -549,7 +585,9 @@
         });
 
         // Biểu đồ trạng thái
-        const ctx2 = document.getElementById('statusChart').getContext('2d');
+        const statusChartCanvas = document.getElementById('statusChart');
+        if (!statusChartCanvas) return;
+        const ctx2 = statusChartCanvas.getContext('2d');
         const statusCount = { 'Đầy Đủ': 0, 'Ít': 0, 'Hết': 0 };
         products.forEach(p => statusCount[getStatus(p.quantity)]++);
         if (statusChart) statusChart.destroy();
@@ -563,7 +601,6 @@
         });
     }
 
-    // Xuất PDF
     function exportToPDF() {
         if (!hasPermission('canExport')) return;
         window.print();
