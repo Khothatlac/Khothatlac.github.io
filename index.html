@@ -56,8 +56,18 @@
         document.getElementById('roleBadge').innerHTML = `<span class="badge bg-${currentRole === 'admin' ? 'danger' : currentRole === 'manager' ? 'warning' : 'secondary'}">${currentRole.toUpperCase()}</span>`;
     }
 
-    // ===== AUTHENTICATION ===== (Giữ nguyên, không thay đổi)
+    // ===== AUTHENTICATION =====
     document.addEventListener('DOMContentLoaded', function() {
+        // Sửa: Force hide modal và unlock body ngay từ đầu để tránh blank page khi reload
+        const modal = document.getElementById('authModal');
+        if (modal) {
+            modal.classList.remove('show', 'd-block', 'fade');
+            modal.style.display = 'none';
+            modal.style.background = 'none';
+        }
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = 'auto';  // Unlock scroll luôn
+
         // Load users nếu chưa có, tạo admin mặc định (ẩn)
         if (users.length === 0) {
             users = [{ username: 'admin', password: '123456', role: 'admin' }];  // Admin mặc định ẩn
@@ -158,15 +168,31 @@
         if (savedUser && savedRole) {
             currentUser = savedUser;
             currentRole = savedRole;
+            // Sửa: Force hide modal lại lần nữa cho an toàn khi reload
             const modal = document.getElementById('authModal');
-            modal.classList.remove('show', 'd-block');
-            modal.style.display = 'none';
+            if (modal) {
+                modal.classList.remove('show', 'd-block', 'fade');
+                modal.style.display = 'none';
+                modal.style.background = 'none';
+            }
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = 'auto';
             document.getElementById('mainContent').style.display = 'block';
             setTimeout(() => {
                 console.log('Loading saved session data...');  // Debug log
                 loadAllData();
                 updateUIForRole();
             }, 500);  // Delay for F5 cases
+        } else {
+            // Nếu chưa login, show modal
+            const modal = document.getElementById('authModal');
+            if (modal) {
+                modal.classList.add('show', 'd-block');
+                modal.style.display = 'block';
+                modal.style.background = 'rgba(0,0,0,0.5)';
+                document.body.classList.add('modal-open');
+                document.body.style.overflow = 'hidden';
+            }
         }
 
         // Dynamic load for tabs (load data when tab shown)
@@ -210,10 +236,18 @@
 
     function loadAllData() {
         console.log('Initial loadAllData called');  // Debug
-        // Sửa: Load lại từ localStorage để đảm bảo data mới nhất
-        products = JSON.parse(localStorage.getItem('products')) || [];
-        transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-        console.log('Loaded products:', products.length, 'items');  // Debug log số lượng sản phẩm load
+        try {
+            // Sửa: Try-catch để tránh lỗi parse JSON gây blank page
+            products = JSON.parse(localStorage.getItem('products')) || [];
+            transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+            console.log('Loaded products:', products.length, 'items');  // Debug log số lượng sản phẩm load
+        } catch (error) {
+            console.error('Lỗi load localStorage:', error);  // Log lỗi nếu JSON corrupt
+            products = [];  // Fallback rỗng
+            transactions = [];
+            localStorage.removeItem('products');  // Xóa data lỗi
+            localStorage.removeItem('transactions');
+        }
         loadProducts();
         loadTransactions();
         updateReportData();  // Separate for charts
@@ -249,7 +283,7 @@
         });
     }
 
-    // Dữ liệu mẫu (Giữ nguyên)
+    // Dữ liệu mẫu
     function loadSampleData() {
         products = [
             { id: '1', code: 'SP001', name: 'Laptop Dell', importPrice: 15000000, sellPrice: 18000000, quantity: 15 },
@@ -269,15 +303,19 @@
         alert('Đã load dữ liệu mẫu!');
     }
 
-    // Lưu dữ liệu (Sửa: Thêm debug log)
+    // Lưu dữ liệu
     function saveData() {
-        localStorage.setItem('products', JSON.stringify(products));
-        localStorage.setItem('transactions', JSON.stringify(transactions));
-        console.log('Saved products to localStorage:', products.length, 'items');  // Debug: Kiểm tra số lượng lưu
+        try {
+            localStorage.setItem('products', JSON.stringify(products));
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+            console.log('Saved products to localStorage:', products.length, 'items');  // Debug log
+        } catch (error) {
+            console.error('Lỗi save localStorage:', error);  // Log nếu quota full hoặc lỗi khác
+            alert('Lỗi lưu dữ liệu! Kiểm tra localStorage.');
+        }
     }
 
-    // ===== SẢN PHẨM ===== (Giữ nguyên phần load, search, filter, pagination, stats, formatCurrency, reset, edit, delete - không thay đổi)
-
+    // ===== SẢN PHẨM =====
     function loadProducts(filter = null) {
         console.log('loadProducts called');  // Debug
         filteredProducts = products.filter(p => !filter || getStatus(p.quantity) === filter);
@@ -393,10 +431,9 @@
         } else {
             products.push(product);
         }
-        saveData();  // Lưu ngay sau khi thêm/sửa
-        console.log('Product saved:', product);  // Debug log sản phẩm vừa lưu
+        saveData();
         bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
-        loadProducts();  // Reload bảng ngay
+        loadProducts();
         resetProductForm();
     }
 
@@ -409,7 +446,7 @@
         }
     }
 
-    // ===== GIAO DỊCH ===== (Giữ nguyên)
+    // ===== GIAO DỊCH =====
     function updateTransactionProductSelect() {
         const select = document.getElementById('transactionProduct');
         select.innerHTML = '<option value="">-- Chọn --</option>' + products.map(p => `<option value="${p.id}">${p.code} - ${p.name} (Tồn: ${p.quantity})</option>`).join('');
@@ -494,40 +531,24 @@
         loadTransactions(date || null);
     }
 
-    // ===== BÁO CÁO ===== (Sửa: Thay line chart thành bar chart cho tồn kho từng sản phẩm)
+    // ===== BÁO CÁO =====
     function updateCharts() {
         console.log('updateCharts called');  // Debug
-        
-        // Biểu đồ cột tồn kho (bar chart cho từng sản phẩm)
+        // Biểu đồ tồn kho
         const ctx1 = document.getElementById('stockChart').getContext('2d');
-        if (products.length === 0) {
-            ctx1.canvas.parentNode.innerHTML = '<p class="text-muted text-center">Chưa có sản phẩm để hiển thị biểu đồ.</p>';  // Fallback nếu rỗng
-            return;
-        }
-        const productNames = products.map(p => p.name);
-        const stockData = products.map(p => p.quantity);
+        const dates = [...new Set(transactions.map(t => t.date))].sort();
+        const data = dates.map(d => {
+            const lastTrans = transactions.filter(t => t.date <= d).reduce((sum, t) => sum + (t.type === 'import' ? t.quantity : -t.quantity), 0);
+            return lastTrans;
+        });
         if (stockChart) stockChart.destroy();
         stockChart = new Chart(ctx1, {
-            type: 'bar',  // Sửa: Thay 'line' thành 'bar' cho biểu đồ cột
-            data: { 
-                labels: productNames,
-                datasets: [{ 
-                    label: 'Số Lượng Tồn Kho', 
-                    data: stockData, 
-                    backgroundColor: 'rgba(79, 172, 254, 0.6)',
-                    borderColor: '#4facfe',
-                    borderWidth: 1 
-                }] 
-            },
-            options: { 
-                responsive: true, 
-                scales: { 
-                    y: { beginAtZero: true } 
-                } 
-            }
+            type: 'line',
+            data: { labels: dates, datasets: [{ label: 'Tồn Kho', data, borderColor: '#4facfe', fill: false }] },
+            options: { responsive: true, scales: { y: { beginAtZero: true } } }
         });
 
-        // Biểu đồ trạng thái (Giữ nguyên pie chart)
+        // Biểu đồ trạng thái
         const ctx2 = document.getElementById('statusChart').getContext('2d');
         const statusCount = { 'Đầy Đủ': 0, 'Ít': 0, 'Hết': 0 };
         products.forEach(p => statusCount[getStatus(p.quantity)]++);
@@ -542,7 +563,7 @@
         });
     }
 
-    // Xuất PDF (Giữ nguyên)
+    // Xuất PDF
     function exportToPDF() {
         if (!hasPermission('canExport')) return;
         window.print();
