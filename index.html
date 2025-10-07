@@ -59,6 +59,9 @@
                                     <button type="submit" class="btn btn-primary">Đăng Nhập</button>
                                 </div>
                             </form>
+                            <div class="alert alert-info mt-2 small">
+                                <i class="fas fa-info-circle"></i> Tài khoản mặc định: admin / 123456 (Admin) hoặc manager / manager123 (Manager)
+                            </div>
                         </div>
                         <!-- Tab Đăng Ký -->
                         <div class="tab-pane fade" id="register" role="tabpanel">
@@ -422,7 +425,7 @@
                 document.body.classList.remove('modal-open');
                 document.body.style.overflow = 'auto';
 
-                // Load users nếu chưa có, tạo admin và manager mặc định
+                // Load users nếu chưa có, tạo admin và manager mặc định - FIX: Luôn kiểm tra và thêm manager nếu thiếu
                 let usersData = localStorage.getItem('users');
                 if (!usersData) {
                     users = [
@@ -432,8 +435,25 @@
                     localStorage.setItem('users', JSON.stringify(users));
                     console.log('Đã tạo users mặc định:', users);
                 } else {
-                    users = JSON.parse(usersData);
-                    console.log('Loaded users:', users);
+                    try {
+                        users = JSON.parse(usersData);
+                        // Kiểm tra và thêm manager nếu thiếu
+                        const hasManager = users.find(u => u.username.toLowerCase() === 'manager');
+                        if (!hasManager) {
+                            users.push({ username: 'manager', password: 'manager123', role: 'manager' });
+                            localStorage.setItem('users', JSON.stringify(users));
+                            console.log('Đã thêm manager vào users:', users);
+                        }
+                        console.log('Loaded users:', users);
+                    } catch (parseError) {
+                        console.error('Lỗi parse users:', parseError);
+                        // Reset nếu lỗi parse
+                        users = [
+                            { username: 'admin', password: '123456', role: 'admin' },
+                            { username: 'manager', password: 'manager123', role: 'manager' }
+                        ];
+                        localStorage.setItem('users', JSON.stringify(users));
+                    }
                 }
 
                 // Clear invalid class on input
@@ -452,7 +472,9 @@
                         if (!loginUsername || !loginPassword) return;
                         const username = loginUsername.value.toLowerCase().trim();
                         const password = loginPassword.value;
-                        const user = users.find(u => u.username === username && u.password === password);
+                        console.log('Đang kiểm tra login:', username, password); // Debug log
+                        const user = users.find(u => u.username.toLowerCase() === username && u.password === password);
+                        console.log('User found:', user); // Debug log
                         if (user) {
                             currentUser = user.username;
                             currentRole = user.role;
@@ -499,7 +521,7 @@
                         const password = regPassword.value;
                         const confirmPassword = regConfirmPassword.value;
                         // Validation
-                        if (users.find(u => u.username === username)) {
+                        if (users.find(u => u.username.toLowerCase() === username)) {
                             alert('Tên đăng nhập đã tồn tại!');
                             regUsername.classList.add('is-invalid');
                             return;
@@ -646,8 +668,7 @@
             loadProducts();
             loadTransactions();
             updateReportData();
-            // Load sample data tự động nếu chưa có dữ liệu (cho tất cả role, để tránh bảng trống)
-            if (products.length === 0) loadSampleData();
+            if (hasPermission('canLoadSample') && products.length === 0) loadSampleData();
         }
 
         // Separate function for reports (with charts)
@@ -682,11 +703,6 @@
 
         // Dữ liệu mẫu
         function loadSampleData() {
-            // Kiểm tra quyền cho nút manual load
-            if (!hasPermission('canLoadSample')) {
-                alert('Bạn không có quyền load dữ liệu mẫu thủ công!');
-                return;
-            }
             products = [
                 { id: '1', code: 'SP001', name: 'Laptop Dell', importPrice: 15000000, sellPrice: 18000000, quantity: 15 },
                 { id: '2', code: 'SP002', name: 'Chuột Không Dây', importPrice: 200000, sellPrice: 300000, quantity: 50 },
@@ -803,10 +819,7 @@
         function formatCurrency(num) { return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ'; }
 
         function resetProductForm() {
-            if (!hasPermission('canAdd')) {
-                alert('Bạn không có quyền thêm sản phẩm!');
-                return;
-            }
+            if (!hasPermission('canAdd')) return;
             const productForm = document.getElementById('productForm');
             const editProductId = document.getElementById('editProductId');
             const productModalTitle = document.getElementById('productModalTitle');
@@ -816,10 +829,7 @@
         }
 
         function editProduct(id) {
-            if (!hasPermission('canEdit')) {
-                alert('Bạn không có quyền sửa sản phẩm!');
-                return;
-            }
+            if (!hasPermission('canEdit')) return;
             const p = products.find(p => p.id === id);
             if (!p) return;
             const editProductId = document.getElementById('editProductId');
@@ -839,10 +849,7 @@
         }
 
         function saveProduct() {
-            if (!hasPermission('canAdd')) {
-                alert('Bạn không có quyền lưu sản phẩm!');
-                return;
-            }
+            if (!hasPermission('canAdd')) return;
             const editProductId = document.getElementById('editProductId');
             const productCode = document.getElementById('productCode');
             const productName = document.getElementById('productName');
@@ -877,10 +884,7 @@
         }
 
         function deleteProduct(id) {
-            if (!hasPermission('canDelete')) {
-                alert('Bạn không có quyền xóa sản phẩm!');
-                return;
-            }
+            if (!hasPermission('canDelete')) return;
             if (confirm('Xác nhận xóa?')) {
                 products = products.filter(p => p.id !== id);
                 saveData();
@@ -896,10 +900,7 @@
         }
 
         function setTransactionType(type) {
-            if (!hasPermission('canTransaction')) {
-                alert('Bạn không có quyền thực hiện giao dịch!');
-                return;
-            }
+            if (!hasPermission('canTransaction')) return;
             const transactionType = document.getElementById('transactionType');
             const transactionModalTitle = document.getElementById('transactionModalTitle');
             const transactionQuantity = document.getElementById('transactionQuantity');
@@ -931,10 +932,7 @@
         }
 
         function saveTransaction() {
-            if (!hasPermission('canTransaction')) {
-                alert('Bạn không có quyền lưu giao dịch!');
-                return;
-            }
+            if (!hasPermission('canTransaction')) return;
             const transactionType = document.getElementById('transactionType');
             const transactionProduct = document.getElementById('transactionProduct');
             const transactionQuantity = document.getElementById('transactionQuantity');
@@ -1051,18 +1049,12 @@
 
         // Xuất PDF
         function exportToPDF() {
-            if (!hasPermission('canExport')) {
-                alert('Bạn không có quyền xuất PDF!');
-                return;
-            }
+            if (!hasPermission('canExport')) return;
             window.print();
         }
 
         function clearAllData() {
-            if (!hasPermission('canClearAll')) {
-                alert('Bạn không có quyền xóa tất cả dữ liệu!');
-                return;
-            }
+            if (!hasPermission('canClearAll')) return;
             if (confirm('Xóa tất cả dữ liệu? Không thể khôi phục!')) {
                 products = []; transactions = [];
                 localStorage.removeItem('products');
