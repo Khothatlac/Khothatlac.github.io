@@ -91,7 +91,6 @@
             </div>
         </div>
     </div>
-
     <!-- Nội dung chính (Ẩn ban đầu) -->
     <div id="mainContent" style="display: none;">
         <!-- Header -->
@@ -112,7 +111,6 @@
                 </div>
             </div>
         </div>
-
         <div class="container mt-4">
             <!-- Navigation Tabs -->
             <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
@@ -126,7 +124,6 @@
                     <button class="nav-link" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab">Báo Cáo</button>
                 </li>
             </ul>
-
             <div class="tab-content">
                 <!-- Tab 1: Sản Phẩm -->
                 <div class="tab-pane fade show active" id="products" role="tabpanel">
@@ -157,7 +154,6 @@
                             </div>
                         </div>
                     </div>
-
                     <!-- Controls -->
                     <div class="card mb-4">
                         <div class="card-body">
@@ -184,7 +180,6 @@
                             </div>
                         </div>
                     </div>
-
                     <!-- Table -->
                     <div class="card">
                         <div class="card-body">
@@ -208,7 +203,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Tab 2: Nhập/Xuất Kho -->
                 <div class="tab-pane fade" id="transactions" role="tabpanel">
                     <div class="card mb-4">
@@ -248,7 +242,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Tab 3: Báo Cáo -->
                 <div class="tab-pane fade" id="reports" role="tabpanel">
                     <div class="row">
@@ -282,7 +275,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal Sản Phẩm -->
     <div class="modal fade" id="productModal">
         <div class="modal-dialog">
@@ -319,7 +311,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal Giao Dịch -->
     <div class="modal fade" id="transactionModal">
         <div class="modal-dialog">
@@ -355,28 +346,24 @@
             </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let products = JSON.parse(localStorage.getItem('products')) || [];
         let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-        let users = JSON.parse(localStorage.getItem('users')) || [];  // Mảng users: [{username, password, role}]
+        let users = JSON.parse(localStorage.getItem('users')) || []; // Mảng users: [{username, password, role}]
         let currentPage = 1, itemsPerPage = 10;
         let filteredProducts = [], filteredTransactions = [];
         let stockChart, statusChart;
         let currentRole = null, currentUser = null;
-
         // Quyền hạn
         const roles = {
             admin: { canAdd: true, canEdit: true, canDelete: true, canTransaction: true, canLoadSample: true, canClearAll: true, canExport: true },
             manager: { canAdd: true, canEdit: true, canDelete: true, canTransaction: true, canLoadSample: false, canClearAll: false, canExport: true },
             viewer: { canAdd: false, canEdit: false, canDelete: false, canTransaction: false, canLoadSample: false, canClearAll: false, canExport: true }
         };
-
         function hasPermission(permission) {
             return roles[currentRole]?.[permission] || false;
         }
-
         function updateUIForRole() {
             const elements = {
                 addProductBtn: 'canAdd',
@@ -414,20 +401,17 @@
             document.getElementById('roleDisplay').textContent = `Chào ${currentUser} (${currentRole.toUpperCase()})`;
             document.getElementById('roleBadge').innerHTML = `<span class="badge bg-${currentRole === 'admin' ? 'danger' : currentRole === 'manager' ? 'warning' : 'secondary'}">${currentRole.toUpperCase()}</span>`;
         }
-
         // ===== AUTHENTICATION =====
         document.addEventListener('DOMContentLoaded', function() {
             // Load users nếu chưa có, tạo admin mặc định (ẩn)
             if (users.length === 0) {
-                users = [{ username: 'admin', password: '123456', role: 'admin' }];  // Admin mặc định ẩn
+                users = [{ username: 'admin', password: '123456', role: 'admin' }]; // Admin mặc định ẩn
                 localStorage.setItem('users', JSON.stringify(users));
             }
-
             // Clear invalid class on input
             function clearInvalid(inputId) {
                 document.getElementById(inputId).classList.remove('is-invalid');
             }
-
             // Event Đăng Nhập
             document.getElementById('loginForm').addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -439,40 +423,39 @@
                     currentRole = user.role;
                     localStorage.setItem('currentUser', username);
                     localStorage.setItem('currentRole', currentRole);
-                    
+                   
                     // Close modal completely
                     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('authModal'));
                     modalInstance.hide();
-                    
+                   
                     // Force remove modal classes and backdrop
                     setTimeout(() => {
                         const modal = document.getElementById('authModal');
                         modal.classList.remove('show', 'd-block');
                         modal.style.display = 'none';
-                        modal.style.background = 'none';  // Clear backdrop
-                        document.body.classList.remove('modal-open');  // Remove body lock
-                        document.body.style.overflow = 'auto';  // Restore scroll
-                        
+                        modal.style.background = 'none'; // Clear backdrop
+                        document.body.classList.remove('modal-open'); // Remove body lock
+                        document.body.style.overflow = 'auto'; // Restore scroll
+                       
                         // Show main content
                         document.getElementById('mainContent').style.display = 'block';
-                        
+                       
                         // Delay load data to ensure DOM rendered
                         setTimeout(() => {
-                            console.log('Loading data after login...');  // Debug log
+                            console.log('Loading data after login...'); // Debug log
                             loadAllData();
                             updateUIForRole();
-                            
+                           
                             // Show success alert
                             alert(`Đăng nhập thành công! Chào mừng ${currentUser} với vai trò ${currentRole.toUpperCase()}.`);
-                        }, 500);  // Wait for DOM to fully render
-                    }, 300);  // Wait for fade-out animation
+                        }, 500); // Wait for DOM to fully render
+                    }, 300); // Wait for fade-out animation
                 } else {
                     alert('Tên đăng nhập hoặc mật khẩu không đúng!');
                     document.getElementById('loginUsername').classList.add('is-invalid');
                     document.getElementById('loginPassword').classList.add('is-invalid');
                 }
             });
-
             // Event Đăng Ký
             document.getElementById('registerForm').addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -503,14 +486,12 @@
                 document.getElementById('registerForm').reset();
                 document.getElementById('login-tab').click();
                 document.getElementById('loginUsername').value = username;
-                document.getElementById('loginPassword').value = password;  // Auto-fill để đăng nhập nhanh
+                document.getElementById('loginPassword').value = password; // Auto-fill để đăng nhập nhanh
             });
-
             // Clear invalid on input
             ['regUsername', 'regPassword', 'regConfirmPassword', 'loginUsername', 'loginPassword'].forEach(id => {
                 document.getElementById(id).addEventListener('input', () => clearInvalid(id));
             });
-
             // Check nếu đã login
             const savedUser = localStorage.getItem('currentUser');
             const savedRole = localStorage.getItem('currentRole');
@@ -522,12 +503,11 @@
                 modal.style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
                 setTimeout(() => {
-                    console.log('Loading saved session data...');  // Debug log
+                    console.log('Loading saved session data...'); // Debug log
                     loadAllData();
                     updateUIForRole();
-                }, 500);  // Delay for F5 cases
+                }, 500); // Delay for F5 cases
             }
-
             // Dynamic load for tabs (load data when tab shown)
             const triggerTabList = document.querySelectorAll('#mainTabs button');
             triggerTabList.forEach(triggerEl => {
@@ -535,20 +515,19 @@
                 triggerEl.addEventListener('shown.bs.tab', function (e) {
                     const targetTab = e.target.getAttribute('data-bs-target');
                     if (targetTab === '#products') {
-                        console.log('Loading products tab...');  // Debug
+                        console.log('Loading products tab...'); // Debug
                         loadProducts();
                         updateStats();
                     } else if (targetTab === '#transactions') {
-                        console.log('Loading transactions tab...');  // Debug
+                        console.log('Loading transactions tab...'); // Debug
                         loadTransactions();
                     } else if (targetTab === '#reports') {
-                        console.log('Loading reports tab...');  // Debug
+                        console.log('Loading reports tab...'); // Debug
                         updateReportData();
                     }
                 });
             });
         });
-
         function logout() {
             localStorage.removeItem('currentUser');
             localStorage.removeItem('currentRole');
@@ -564,24 +543,21 @@
             // Reset forms
             document.getElementById('loginForm').reset();
             document.getElementById('registerForm').reset();
-            document.getElementById('login-tab').click();  // Về tab Login
+            document.getElementById('login-tab').click(); // Về tab Login
         }
-
         function loadAllData() {
-            console.log('Initial loadAllData called');  // Debug
+            console.log('Initial loadAllData called'); // Debug
             loadProducts();
             loadTransactions();
-            updateReportData();  // Separate for charts
+            updateReportData(); // Separate for charts
             if (hasPermission('canLoadSample') && products.length === 0) loadSampleData();
         }
-
         // Separate function for reports (with charts)
         function updateReportData() {
-            console.log('Updating reports...');  // Debug
+            console.log('Updating reports...'); // Debug
             updateCharts();
             updateReportTable();
         }
-
         function updateReportTable() {
             const tbody = document.getElementById('reportBody');
             tbody.innerHTML = '';
@@ -603,7 +579,6 @@
                 `;
             });
         }
-
         // Dữ liệu mẫu
         function loadSampleData() {
             products = [
@@ -623,20 +598,17 @@
             updateReportData();
             alert('Đã load dữ liệu mẫu!');
         }
-
         // Lưu dữ liệu
         function saveData() {
             localStorage.setItem('products', JSON.stringify(products));
             localStorage.setItem('transactions', JSON.stringify(transactions));
         }
-
         // ===== SẢN PHẨM =====
         function loadProducts(filter = null) {
-            console.log('loadProducts called');  // Debug
+            console.log('loadProducts called'); // Debug
             filteredProducts = products.filter(p => !filter || getStatus(p.quantity) === filter);
             const start = (currentPage - 1) * itemsPerPage;
             const pageProducts = filteredProducts.slice(start, start + itemsPerPage);
-
             const tbody = document.getElementById('productsBody');
             tbody.innerHTML = '';
             pageProducts.forEach(p => {
@@ -662,21 +634,17 @@
             updateStats();
             updateTransactionProductSelect();
         }
-
         function getStatus(qty) { return qty > 10 ? 'Đầy Đủ' : qty > 0 ? 'Ít' : 'Hết'; }
-
         function searchProducts() {
             const query = document.getElementById('searchInput').value.toLowerCase();
             filteredProducts = products.filter(p => p.code.toLowerCase().includes(query) || p.name.toLowerCase().includes(query));
             currentPage = 1;
             loadProducts();
         }
-
         function filterProducts() {
             const status = document.getElementById('filterStatus').value;
             loadProducts(status);
         }
-
         function updatePagination(total) {
             const totalPages = Math.ceil(total / itemsPerPage);
             let html = '';
@@ -685,33 +653,27 @@
             }
             document.getElementById('pagination').innerHTML = html;
         }
-
         function changePage(page) {
             currentPage = page;
             loadProducts(document.getElementById('filterStatus').value);
         }
-
         function updateStats() {
             const total = products.length;
             const value = products.reduce((sum, p) => sum + (p.quantity * p.importPrice), 0);
             const low = products.filter(p => p.quantity > 0 && p.quantity <= 10).length;
             const out = products.filter(p => p.quantity === 0).length;
-
             document.getElementById('totalProducts').textContent = total;
             document.getElementById('totalValue').textContent = formatCurrency(value);
             document.getElementById('lowStock').textContent = low;
             document.getElementById('outOfStock').textContent = out;
         }
-
         function formatCurrency(num) { return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ'; }
-
         function resetProductForm() {
             if (!hasPermission('canAdd')) return;
             document.getElementById('productForm').reset();
             document.getElementById('editProductId').value = '';
             document.getElementById('productModalTitle').textContent = 'Thêm Sản Phẩm';
         }
-
         function editProduct(id) {
             if (!hasPermission('canEdit')) return;
             const p = products.find(p => p.id === id);
@@ -723,7 +685,6 @@
             document.getElementById('productModalTitle').textContent = 'Sửa Sản Phẩm';
             new bootstrap.Modal(document.getElementById('productModal')).show();
         }
-
         function saveProduct() {
             if (!hasPermission('canAdd')) return;
             const id = document.getElementById('editProductId').value;
@@ -751,7 +712,6 @@
             loadProducts();
             resetProductForm();
         }
-
         function deleteProduct(id) {
             if (!hasPermission('canDelete')) return;
             if (confirm('Xác nhận xóa?')) {
@@ -760,13 +720,11 @@
                 loadProducts();
             }
         }
-
         // ===== GIAO DỊCH =====
         function updateTransactionProductSelect() {
             const select = document.getElementById('transactionProduct');
             select.innerHTML = '<option value="">-- Chọn --</option>' + products.map(p => `<option value="${p.id}">${p.code} - ${p.name} (Tồn: ${p.quantity})</option>`).join('');
         }
-
         function setTransactionType(type) {
             if (!hasPermission('canTransaction')) return;
             document.getElementById('transactionType').value = type;
@@ -774,7 +732,6 @@
             document.getElementById('transactionQuantity').min = 1;
             updateQuantityLimit();
         }
-
         function updateQuantityLimit() {
             const prodId = document.getElementById('transactionProduct').value;
             const type = document.getElementById('transactionType').value;
@@ -791,7 +748,6 @@
                 }
             }
         }
-
         function saveTransaction() {
             if (!hasPermission('canTransaction')) return;
             const type = document.getElementById('transactionType').value;
@@ -819,9 +775,8 @@
             loadTransactions();
             updateReportData();
         }
-
         function loadTransactions(dateFilter = null) {
-            console.log('loadTransactions called');  // Debug
+            console.log('loadTransactions called'); // Debug
             filteredTransactions = transactions.filter(t => !dateFilter || t.date === dateFilter);
             const tbody = document.getElementById('transactionsBody');
             tbody.innerHTML = '';
@@ -840,50 +795,66 @@
                 `;
             });
         }
-
         function filterTransactions() {
             const date = document.getElementById('dateFilter').value;
             loadTransactions(date || null);
         }
-
         // ===== BÁO CÁO =====
         function updateCharts() {
-            console.log('updateCharts called');  // Debug
-            // Biểu đồ tồn kho
-            const ctx1 = document.getElementById('stockChart').getContext('2d');
-            const dates = [...new Set(transactions.map(t => t.date))].sort();
-            const data = dates.map(d => {
-                const lastTrans = transactions.filter(t => t.date <= d).reduce((sum, t) => sum + (t.type === 'import' ? t.quantity : -t.quantity), 0);
-                return lastTrans;
-            });
-            if (stockChart) stockChart.destroy();
-            stockChart = new Chart(ctx1, {
-                type: 'line',
-                data: { labels: dates, datasets: [{ label: 'Tồn Kho', data, borderColor: '#4facfe', fill: false }] },
-                options: { responsive: true, scales: { y: { beginAtZero: true } } }
-            });
-
-            // Biểu đồ trạng thái
-            const ctx2 = document.getElementById('statusChart').getContext('2d');
-            const statusCount = { 'Đầy Đủ': 0, 'Ít': 0, 'Hết': 0 };
-            products.forEach(p => statusCount[getStatus(p.quantity)]++);
-            if (statusChart) statusChart.destroy();
-            statusChart = new Chart(ctx2, {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(statusCount),
-                    datasets: [{ data: Object.values(statusCount), backgroundColor: ['#28a745', '#ffc107', '#dc3545'] }]
-                },
-                options: { responsive: true }
-            });
+            console.log('updateCharts called'); // Debug
+            // Biểu đồ cột tồn kho (sửa để hiển thị theo sản phẩm)
+            const stockChartCanvas = document.getElementById('stockChart');
+            if (stockChartCanvas) {
+                const ctx1 = stockChartCanvas.getContext('2d');
+                if (products.length === 0) {
+                    ctx1.canvas.parentNode.innerHTML = '<p class="text-muted text-center">Chưa có sản phẩm để hiển thị biểu đồ.</p>';
+                    return;
+                }
+                const productNames = products.map(p => p.name);
+                const stockData = products.map(p => p.quantity);
+                if (stockChart) stockChart.destroy();
+                stockChart = new Chart(ctx1, {
+                    type: 'bar',
+                    data: { 
+                        labels: productNames,
+                        datasets: [{ 
+                            label: 'Số Lượng Tồn Kho', 
+                            data: stockData, 
+                            backgroundColor: 'rgba(79, 172, 254, 0.6)',
+                            borderColor: '#4facfe',
+                            borderWidth: 1 
+                        }] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        scales: { 
+                            y: { beginAtZero: true } 
+                        } 
+                    }
+                });
+            }
+            // Biểu đồ trạng thái (pie chart giữ nguyên)
+            const statusChartCanvas = document.getElementById('statusChart');
+            if (statusChartCanvas) {
+                const ctx2 = statusChartCanvas.getContext('2d');
+                const statusCount = { 'Đầy Đủ': 0, 'Ít': 0, 'Hết': 0 };
+                products.forEach(p => statusCount[getStatus(p.quantity)]++);
+                if (statusChart) statusChart.destroy();
+                statusChart = new Chart(ctx2, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(statusCount),
+                        datasets: [{ data: Object.values(statusCount), backgroundColor: ['#28a745', '#ffc107', '#dc3545'] }]
+                    },
+                    options: { responsive: true }
+                });
+            }
         }
-
         // Xuất PDF
         function exportToPDF() {
             if (!hasPermission('canExport')) return;
             window.print();
         }
-
         function clearAllData() {
             if (!hasPermission('canClearAll')) return;
             if (confirm('Xóa tất cả dữ liệu? Không thể khôi phục!')) {
