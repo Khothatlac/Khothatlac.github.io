@@ -358,18 +358,15 @@
         let filteredProducts = [], filteredTransactions = [];
         let stockChart, statusChart;
         let currentRole = null, currentUser = null;
-
         // Quyền hạn
         const roles = {
             admin: { canAdd: true, canEdit: true, canDelete: true, canTransaction: true, canLoadSample: true, canClearAll: true, canExport: true },
             manager: { canAdd: true, canEdit: true, canDelete: true, canTransaction: true, canLoadSample: false, canClearAll: false, canExport: true },
-            viewer: { canAdd: false, canEdit: false, canDelete: false, canTransaction: false, canLoadSample: false, canClearAll: false, canExport: true }
+            viewer: { canAdd: false, canEdit: false, canDelete: false, canTransaction: false, canLoadSample: false, canClearAll: false, canExport: false }
         };
-
         function hasPermission(permission) {
             return roles[currentRole]?.[permission] || false;
         }
-
         function updateUIForRole() {
             const elements = {
                 addProductBtn: 'canAdd',
@@ -409,7 +406,6 @@
             if (roleDisplay) roleDisplay.textContent = `Chào ${currentUser} (${currentRole.toUpperCase()})`;
             if (roleBadge) roleBadge.innerHTML = `<span class="badge bg-${currentRole === 'admin' ? 'danger' : currentRole === 'manager' ? 'warning' : 'secondary'}">${currentRole.toUpperCase()}</span>`;
         }
-
         // ===== AUTHENTICATION =====
         document.addEventListener('DOMContentLoaded', function() {
             try {
@@ -424,7 +420,6 @@
                 }
                 document.body.classList.remove('modal-open');
                 document.body.style.overflow = 'auto';
-
                 // Load users nếu chưa có, tạo admin và manager mặc định - FIX: Luôn kiểm tra và thêm manager nếu thiếu
                 let usersData = localStorage.getItem('users');
                 if (!usersData) {
@@ -455,13 +450,11 @@
                         localStorage.setItem('users', JSON.stringify(users));
                     }
                 }
-
                 // Clear invalid class on input
                 function clearInvalid(inputId) {
                     const input = document.getElementById(inputId);
                     if (input) input.classList.remove('is-invalid');
                 }
-
                 // Event Đăng Nhập - Kiểm tra element tồn tại
                 const loginForm = document.getElementById('loginForm');
                 if (loginForm) {
@@ -480,7 +473,7 @@
                             currentRole = user.role;
                             localStorage.setItem('currentUser', username);
                             localStorage.setItem('currentRole', currentRole);
-                            
+                           
                             // Close modal and show main
                             if (modalInstance) modalInstance.hide();
                             setTimeout(() => {
@@ -493,7 +486,7 @@
                                 document.body.style.overflow = 'auto';
                                 const mainContent = document.getElementById('mainContent');
                                 if (mainContent) mainContent.style.display = 'block';
-                                
+                               
                                 setTimeout(() => {
                                     loadAllData();
                                     updateUIForRole();
@@ -507,7 +500,6 @@
                         }
                     });
                 }
-
                 // Event Đăng Ký - Kiểm tra element tồn tại
                 const registerForm = document.getElementById('registerForm');
                 if (registerForm) {
@@ -549,13 +541,11 @@
                         if (loginPassword) loginPassword.value = password;
                     });
                 }
-
                 // Clear invalid on input
                 ['regUsername', 'regPassword', 'regConfirmPassword', 'loginUsername', 'loginPassword'].forEach(id => {
                     const input = document.getElementById(id);
                     if (input) input.addEventListener('input', () => clearInvalid(id));
                 });
-
                 // Check nếu đã login - Sửa: Load data trước khi check session để tránh treo
                 let savedUser = null;
                 let savedRole = null;
@@ -595,7 +585,6 @@
                         document.body.style.overflow = 'hidden';
                     }
                 }
-
                 // Dynamic load for tabs
                 const mainTabs = document.getElementById('mainTabs');
                 if (mainTabs) {
@@ -622,7 +611,6 @@
                 if (mainContent) mainContent.style.display = 'block';
             }
         });
-
         function logout() {
             try {
                 localStorage.removeItem('currentUser');
@@ -649,7 +637,6 @@
             if (registerForm) registerForm.reset();
             if (loginTab) loginTab.click();
         }
-
         function loadAllData() {
             console.log('Initial loadAllData called');
             try {
@@ -670,14 +657,12 @@
             updateReportData();
             if (hasPermission('canLoadSample') && products.length === 0) loadSampleData();
         }
-
         // Separate function for reports (with charts)
         function updateReportData() {
             console.log('Updating reports...');
             updateCharts();
             updateReportTable();
         }
-
         function updateReportTable() {
             const tbody = document.getElementById('reportBody');
             if (!tbody) return;
@@ -700,7 +685,6 @@
                 `;
             });
         }
-
         // Dữ liệu mẫu
         function loadSampleData() {
             products = [
@@ -720,7 +704,6 @@
             updateReportData();
             alert('Đã load dữ liệu mẫu!');
         }
-
         // Lưu dữ liệu
         function saveData() {
             try {
@@ -732,7 +715,6 @@
                 alert('Lỗi lưu dữ liệu! Hãy thử lại.');
             }
         }
-
         // ===== SẢN PHẨM =====
         function loadProducts(filter = null) {
             console.log('loadProducts called');
@@ -765,9 +747,7 @@
             updateStats();
             updateTransactionProductSelect();
         }
-
         function getStatus(qty) { return qty > 10 ? 'Đầy Đủ' : qty > 0 ? 'Ít' : 'Hết'; }
-
         function searchProducts() {
             const searchInput = document.getElementById('searchInput');
             if (!searchInput) return;
@@ -776,14 +756,12 @@
             currentPage = 1;
             loadProducts();
         }
-
         function filterProducts() {
             const filterStatus = document.getElementById('filterStatus');
             if (!filterStatus) return;
             const status = filterStatus.value;
             loadProducts(status);
         }
-
         function updatePagination(total) {
             const totalPages = Math.ceil(total / itemsPerPage);
             let html = '';
@@ -793,13 +771,11 @@
             const pagination = document.getElementById('pagination');
             if (pagination) pagination.innerHTML = html;
         }
-
         function changePage(page) {
             currentPage = page;
             const filterStatus = document.getElementById('filterStatus');
             loadProducts(filterStatus ? filterStatus.value : null);
         }
-
         function updateStats() {
             const totalProducts = document.getElementById('totalProducts');
             const totalValue = document.getElementById('totalValue');
@@ -815,9 +791,7 @@
             lowStock.textContent = low;
             outOfStock.textContent = out;
         }
-
         function formatCurrency(num) { return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ'; }
-
         function resetProductForm() {
             if (!hasPermission('canAdd')) return;
             const productForm = document.getElementById('productForm');
@@ -827,7 +801,6 @@
             if (editProductId) editProductId.value = '';
             if (productModalTitle) productModalTitle.textContent = 'Thêm Sản Phẩm';
         }
-
         function editProduct(id) {
             if (!hasPermission('canEdit')) return;
             const p = products.find(p => p.id === id);
@@ -847,7 +820,6 @@
             const productModal = document.getElementById('productModal');
             if (productModal) new bootstrap.Modal(productModal).show();
         }
-
         function saveProduct() {
             if (!hasPermission('canAdd')) return;
             const editProductId = document.getElementById('editProductId');
@@ -882,7 +854,6 @@
             loadProducts();
             resetProductForm();
         }
-
         function deleteProduct(id) {
             if (!hasPermission('canDelete')) return;
             if (confirm('Xác nhận xóa?')) {
@@ -891,14 +862,12 @@
                 loadProducts();
             }
         }
-
         // ===== GIAO DỊCH =====
         function updateTransactionProductSelect() {
             const transactionProduct = document.getElementById('transactionProduct');
             if (!transactionProduct) return;
             transactionProduct.innerHTML = '<option value="">-- Chọn --</option>' + products.map(p => `<option value="${p.id}">${p.code} - ${p.name} (Tồn: ${p.quantity})</option>`).join('');
         }
-
         function setTransactionType(type) {
             if (!hasPermission('canTransaction')) return;
             const transactionType = document.getElementById('transactionType');
@@ -909,7 +878,6 @@
             if (transactionQuantity) transactionQuantity.min = 1;
             updateQuantityLimit();
         }
-
         function updateQuantityLimit() {
             const transactionProduct = document.getElementById('transactionProduct');
             const transactionType = document.getElementById('transactionType');
@@ -930,7 +898,6 @@
                 }
             }
         }
-
         function saveTransaction() {
             if (!hasPermission('canTransaction')) return;
             const transactionType = document.getElementById('transactionType');
@@ -965,7 +932,6 @@
             loadTransactions();
             updateReportData();
         }
-
         function loadTransactions(dateFilter = null) {
             console.log('loadTransactions called');
             filteredTransactions = transactions.filter(t => !dateFilter || t.date === dateFilter);
@@ -987,14 +953,12 @@
                 `;
             });
         }
-
         function filterTransactions() {
             const dateFilter = document.getElementById('dateFilter');
             if (!dateFilter) return;
             const date = dateFilter.value;
             loadTransactions(date || null);
         }
-
         // ===== BÁO CÁO =====
         function updateCharts() {
             console.log('updateCharts called');
@@ -1011,21 +975,21 @@
                 if (stockChart) stockChart.destroy();
                 stockChart = new Chart(ctx1, {
                     type: 'bar',
-                    data: { 
+                    data: {
                         labels: productNames,
-                        datasets: [{ 
-                            label: 'Số Lượng Tồn Kho', 
-                            data: stockData, 
+                        datasets: [{
+                            label: 'Số Lượng Tồn Kho',
+                            data: stockData,
                             backgroundColor: 'rgba(79, 172, 254, 0.6)',
                             borderColor: '#4facfe',
-                            borderWidth: 1 
-                        }] 
+                            borderWidth: 1
+                        }]
                     },
-                    options: { 
-                        responsive: true, 
-                        scales: { 
-                            y: { beginAtZero: true } 
-                        } 
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
                     }
                 });
             }
@@ -1046,13 +1010,11 @@
                 });
             }
         }
-
         // Xuất PDF
         function exportToPDF() {
             if (!hasPermission('canExport')) return;
             window.print();
         }
-
         function clearAllData() {
             if (!hasPermission('canClearAll')) return;
             if (confirm('Xóa tất cả dữ liệu? Không thể khôi phục!')) {
