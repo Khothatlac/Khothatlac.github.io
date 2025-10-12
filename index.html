@@ -378,8 +378,26 @@
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
+        import { getDatabase, ref, set, get, update, remove, onValue, push } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js';
+        import "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js";
+    </script>
+    <script type="module">
+        // Firebase config - Thay thế bằng config của bạn từ Firebase Console
+        const firebaseConfig = {
+            apiKey: "AIzaSyD...example", // Thay bằng apiKey thực
+            authDomain: "your-project.firebaseapp.com",
+            databaseURL: "https://your-project-default-rtdb.firebaseio.com/", // Quan trọng: Thêm databaseURL
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
         let products = [];
         let transactions = [];
         let users = [];
@@ -389,6 +407,9 @@
         let statusFilter = '';
         let stockChart, statusChart;
         let currentRole = null, currentUser = null;
+        let productsRef, transactionsRef;
+        let productsListener, transactionsListener;
+
         // Quyền hạn
         const roles = {
             admin: { canAdd: true, canEdit: true, canDelete: true, canTransaction: true, canLoadSample: true, canClearAll: true, canExport: true },
@@ -436,7 +457,9 @@
         }
         // ===== AUTHENTICATION =====
         document.addEventListener('DOMContentLoaded', function() {
-            // Load users nếu chưa có, tạo admin và manager mặc định
+            productsRef = ref(db, 'products');
+            transactionsRef = ref(db, 'transactions');
+            // Load users từ localStorage (giữ cục bộ cho auth đơn giản)
             let usersData = localStorage.getItem('users');
             if (!usersData) {
                 users = [
@@ -448,7 +471,6 @@
             } else {
                 try {
                     users = JSON.parse(usersData);
-                    // Kiểm tra và thêm manager nếu thiếu
                     const hasManager = users.find(u => u.username.toLowerCase() === 'manager');
                     if (!hasManager) {
                         users.push({ username: 'manager', password: 'manager123', role: 'manager' });
@@ -458,7 +480,6 @@
                     console.log('Loaded users:', users);
                 } catch (parseError) {
                     console.error('Lỗi parse users:', parseError);
-                    // Reset nếu lỗi parse
                     users = [
                         { username: 'admin', password: '123456', role: 'admin' },
                         { username: 'manager', password: 'manager123', role: 'manager' }
@@ -635,23 +656,32 @@
         }
         function loadAllData() {
             console.log('Initial loadAllData called');
-            try {
-                const productsData = localStorage.getItem('products');
-                const transactionsData = localStorage.getItem('transactions');
-                if (productsData) products = JSON.parse(productsData);
-                if (transactionsData) transactions = JSON.parse(transactionsData);
+            // Listen to products
+            if (productsListener) productsListener();
+            productsListener = onValue(productsRef, (snapshot) => {
+                const data = snapshot.val();
+                products = data ? Object.values(data) : [];
                 console.log('Loaded products:', products.length, 'items');
-            } catch (error) {
-                console.error('Lỗi load data:', error);
-                products = [];
-                transactions = [];
-                localStorage.removeItem('products');
-                localStorage.removeItem('transactions');
-            }
-            loadProducts();
-            loadTransactions();
-            updateReportData();
-            if (hasPermission('canLoadSample') && products.length === 0) loadSampleData();
+                loadProducts();
+                updateStats();
+                updateTransactionProductSelect();
+                updateReportData();
+            });
+            // Listen to transactions
+            if (transactionsListener) transactionsListener();
+            transactionsListener = onValue(transactionsRef, (snapshot) => {
+                const data = snapshot.val();
+                transactions = data ? Object.values(data) : [];
+                console.log('Loaded transactions:', transactions.length, 'items');
+                loadTransactions();
+                updateReportData();
+            });
+            // Kiểm tra nếu empty và load sample cho admin
+            get(productsRef).then((snapshot) => {
+                if (hasPermission('canLoadSample') && (!snapshot.exists() || Object.keys(snapshot.val() || {}).length === 0)) {
+                    loadSampleData();
+                }
+            });
         }
         // Separate function for reports (with charts)
         function updateReportData() {
@@ -683,28 +713,36 @@
         }
         // Dữ liệu mẫu
         function loadSampleData() {
-            products = [
-                { id: '1', code: 'SP001', name: 'Laptop Dell', importPrice: 15000000, sellPrice: 18000000, quantity: 15 },
-                { id: '2', code: 'SP002', name: 'Chuột Không Dây', importPrice: 200000, sellPrice: 300000, quantity: 50 },
-                { id: '3', code: 'SP003', name: 'Bàn Phím', importPrice: 500000, sellPrice: 700000, quantity: 5 },
-                { id: '4', code: 'SP004', name: 'Màn Hình', importPrice: 5000000, sellPrice: 6000000, quantity: 0 }
-            ];
-            transactions = [
-                { id: 't1', date: new Date().toISOString().split('T')[0], productId: '1', type: 'import', quantity: 10, note: 'Nhập lô mới' },
-                { id: 't2', date: new Date().toISOString().split('T')[0], productId: '2', type: 'export', quantity: 5, note: 'Bán cho khách' },
-                { id: 't3', date: new Date().toISOString().split('T')[0], productId: '3', type: 'import', quantity: 5, note: 'Bổ sung' }
-            ];
-            saveData();
-            loadProducts();
-            loadTransactions();
-            updateReportData();
-            alert('Đã load dữ liệu mẫu!');
+            const sampleProducts = {
+                '1': { id: '1', code: 'SP001', name: 'Laptop Dell', importPrice: 15000000, sellPrice: 18000000, quantity: 15 },
+                '2': { id: '2', code: 'SP002', name: 'Chuột Không Dây', importPrice: 200000, sellPrice: 300000, quantity: 50 },
+                '3': { id: '3', code: 'SP003', name: 'Bàn Phím', importPrice: 500000, sellPrice: 700000, quantity: 5 },
+                '4': { id: '4', code: 'SP004', name: 'Màn Hình', importPrice: 5000000, sellPrice: 6000000, quantity: 0 }
+            };
+            set(productsRef, sampleProducts).then(() => {
+                const sampleTransactions = {
+                    't1': { id: 't1', date: new Date().toISOString().split('T')[0], productId: '1', type: 'import', quantity: 10, note: 'Nhập lô mới' },
+                    't2': { id: 't2', date: new Date().toISOString().split('T')[0], productId: '2', type: 'export', quantity: 5, note: 'Bán cho khách' },
+                    't3': { id: 't3', date: new Date().toISOString().split('T')[0], productId: '3', type: 'import', quantity: 5, note: 'Bổ sung' }
+                };
+                return set(transactionsRef, sampleTransactions);
+            }).then(() => {
+                alert('Đã load dữ liệu mẫu!');
+            }).catch((error) => {
+                console.error('Lỗi load sample:', error);
+                alert('Lỗi load dữ liệu mẫu!');
+            });
         }
-        // Lưu dữ liệu
-        function saveData() {
+        // Lưu dữ liệu - sử dụng Firebase
+        async function saveData() {
             try {
-                localStorage.setItem('products', JSON.stringify(products));
-                localStorage.setItem('transactions', JSON.stringify(transactions));
+                const productsObj = {};
+                products.forEach(p => { productsObj[p.id] = p; });
+                await set(productsRef, productsObj);
+
+                const transactionsObj = {};
+                transactions.forEach(t => { transactionsObj[t.id] = t; });
+                await set(transactionsRef, transactionsObj);
                 console.log('Saved data successfully');
             } catch (error) {
                 console.error('Lỗi lưu data:', error);
@@ -869,7 +907,7 @@
             const productModal = document.getElementById('productModal');
             if (productModal) new bootstrap.Modal(productModal).show();
         }
-        function saveProduct() {
+        async function saveProduct() {
             if (!hasPermission('canAdd')) return;
             const editProductId = document.getElementById('editProductId');
             const productCode = document.getElementById('productCode');
@@ -877,38 +915,40 @@
             const productImportPrice = document.getElementById('productImportPrice');
             const productSellPrice = document.getElementById('productSellPrice');
             if (!productCode || !productName || !productImportPrice || !productSellPrice) return;
-            const id = editProductId ? editProductId.value : '';
+            const id = editProductId ? editProductId.value : Date.now().toString();
             const code = productCode.value.trim();
             if (products.find(p => p.code === code && p.id !== id)) {
                 alert('Mã SP đã tồn tại!');
                 return;
             }
             const product = {
-                id: id || Date.now().toString(),
+                id,
                 code,
                 name: productName.value,
                 importPrice: parseFloat(productImportPrice.value),
                 sellPrice: parseFloat(productSellPrice.value),
                 quantity: id ? products.find(p => p.id === id).quantity : 0
             };
+            // Update local array
             if (id) {
                 const idx = products.findIndex(p => p.id === id);
                 if (idx > -1) products[idx] = product;
             } else {
                 products.push(product);
             }
-            saveData();
+            // Save to Firebase
+            await set(ref(db, `products/${id}`), product);
             const productModal = document.getElementById('productModal');
             if (productModal) bootstrap.Modal.getInstance(productModal).hide();
             loadProducts();
             resetProductForm();
         }
-        function deleteProduct(id) {
+        async function deleteProduct(id) {
             if (!hasPermission('canDelete')) return;
             if (confirm('Xác nhận xóa?')) {
-                products = products.filter(p => p.id !== id);
-                saveData();
-                loadProducts();
+                // Remove from Firebase
+                await remove(ref(db, `products/${id}`));
+                // Local update sẽ sync qua listener
             }
         }
         // ===== GIAO DỊCH =====
@@ -947,7 +987,7 @@
                 }
             }
         }
-        function saveTransaction() {
+        async function saveTransaction() {
             if (!hasPermission('canTransaction')) return;
             const transactionType = document.getElementById('transactionType');
             const transactionProduct = document.getElementById('transactionProduct');
@@ -964,22 +1004,24 @@
                 alert('Số lượng không hợp lệ!');
                 return;
             }
+            const transactionId = Date.now().toString();
             const transaction = {
-                id: Date.now().toString(),
+                id: transactionId,
                 date: new Date().toISOString().split('T')[0],
                 productId: prodId,
                 type,
                 quantity: qty,
                 note: transactionNote ? transactionNote.value : ''
             };
+            // Add to local
             transactions.push(transaction);
             p.quantity += type === 'import' ? qty : -qty;
-            saveData();
+            // Save to Firebase
+            await set(ref(db, `transactions/${transactionId}`), transaction);
+            await set(ref(db, `products/${prodId}`), p);
             if (transactionModal) bootstrap.Modal.getInstance(transactionModal).hide();
             if (transactionForm) transactionForm.reset();
-            loadProducts();
-            loadTransactions();
-            updateReportData();
+            // Listener sẽ update UI
         }
         function loadTransactions(dateFilter = null) {
             console.log('loadTransactions called');
@@ -1064,13 +1106,11 @@
             if (!hasPermission('canExport')) return;
             window.print();
         }
-        function clearAllData() {
+        async function clearAllData() {
             if (!hasPermission('canClearAll')) return;
             if (confirm('Xóa tất cả dữ liệu? Không thể khôi phục!')) {
-                products = []; transactions = [];
-                localStorage.removeItem('products');
-                localStorage.removeItem('transactions');
-                loadProducts(); loadTransactions(); updateReportData();
+                await set(productsRef, null);
+                await set(transactionsRef, null);
                 alert('Đã xóa!');
             }
         }
@@ -1085,4 +1125,3 @@
     </script>
 </body>
 </html>
-```
