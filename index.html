@@ -1,9 +1,10 @@
+```html
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản Lý Kho Hàng - Hệ Thống Kho thất lạc</title>
+    <title>Quản Lý Kho Hàng - Hệ Thống Kho Thất Lạc</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,11 +23,37 @@
         .login-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
         .role-badge { font-size: 0.8em; }
         .tab-content .form-control.is-invalid { border-color: #dc3545; }
+        /* Styles for search dropdown */
+        #searchDropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 0.375rem 0.375rem;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #searchDropdown .dropdown-item {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        #searchDropdown .dropdown-item:hover {
+            background-color: #f8f9fa;
+        }
+        #searchDropdown .dropdown-item:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 <body>
     <!-- Login/Register Modal (Hiển thị đầu tiên) -->
-    <div class="modal fade show d-block" id="authModal" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+    <div class="modal fade" id="authModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
@@ -158,7 +185,7 @@
                         </div>
                     </div>
                     <!-- Controls -->
-                    <div class="card mb-4">
+                    <div class="card mb-4 position-relative">
                         <div class="card-body">
                             <div class="row align-items-center">
                                 <div class="col-md-4">
@@ -176,9 +203,11 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="input-group">
-                                        <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm..." onkeyup="searchProducts()">
-                                        <button class="btn btn-outline-secondary"><i class="fas fa-search"></i></button>
+                                        <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm sản phẩm..." onkeyup="handleSearchInput()">
+                                        <button class="btn btn-outline-secondary" onclick="clearSearch()"><i class="fas fa-times"></i></button>
                                     </div>
+                                    <!-- Search Dropdown -->
+                                    <div id="searchDropdown"></div>
                                 </div>
                             </div>
                         </div>
@@ -196,7 +225,7 @@
                                             <th>Giá Nhập (VNĐ)</th>
                                             <th>Giá Bán (VNĐ)</th>
                                             <th>Trạng Thái</th>
-                                            <th>Hành Động</th>
+                                            <th class="d-none">Hành Động</th>
                                         </tr>
                                     </thead>
                                     <tbody id="productsBody"></tbody>
@@ -356,6 +385,8 @@
         let users = [];
         let currentPage = 1, itemsPerPage = 10;
         let filteredProducts = [], filteredTransactions = [];
+        let searchQuery = '';
+        let statusFilter = '';
         let stockChart, statusChart;
         let currentRole = null, currentUser = null;
         // Quyền hạn
@@ -392,14 +423,11 @@
             });
             // Ẩn cột Hành Động nếu không có quyền edit
             const actionTh = document.querySelector('#productsTable thead th:last-child');
-            const actionTds = document.querySelectorAll('#productsBody td:last-child');
-            if (hasPermission('canEdit')) {
-                if (actionTh) actionTh.classList.remove('d-none');
-                actionTds.forEach(td => td.classList.remove('d-none'));
-            } else {
-                if (actionTh) actionTh.classList.add('d-none');
-                actionTds.forEach(td => td.classList.add('d-none'));
+            if (actionTh) {
+                actionTh.classList.toggle('d-none', !hasPermission('canEdit'));
             }
+            const actionTds = document.querySelectorAll('#productsBody td:last-child');
+            actionTds.forEach(td => td.classList.toggle('d-none', !hasPermission('canEdit')));
             // Hiển thị role
             const roleDisplay = document.getElementById('roleDisplay');
             const roleBadge = document.getElementById('roleBadge');
@@ -408,207 +436,178 @@
         }
         // ===== AUTHENTICATION =====
         document.addEventListener('DOMContentLoaded', function() {
-            try {
-                // Sửa: Force hide modal và unlock body ngay đầu để tránh treo modal khi reload
-                const modal = document.getElementById('authModal');
-                if (modal) {
-                    modal.classList.remove('show', 'd-block', 'fade');
-                    modal.style.display = 'none';
-                    modal.style.background = 'none';
-                    const modalInstance = bootstrap.Modal.getInstance(modal);
-                    if (modalInstance) modalInstance.hide();
-                }
-                document.body.classList.remove('modal-open');
-                document.body.style.overflow = 'auto';
-                // Load users nếu chưa có, tạo admin và manager mặc định - FIX: Luôn kiểm tra và thêm manager nếu thiếu
-                let usersData = localStorage.getItem('users');
-                if (!usersData) {
+            // Load users nếu chưa có, tạo admin và manager mặc định
+            let usersData = localStorage.getItem('users');
+            if (!usersData) {
+                users = [
+                    { username: 'admin', password: '123456', role: 'admin' },
+                    { username: 'manager', password: 'manager123', role: 'manager' }
+                ];
+                localStorage.setItem('users', JSON.stringify(users));
+                console.log('Đã tạo users mặc định:', users);
+            } else {
+                try {
+                    users = JSON.parse(usersData);
+                    // Kiểm tra và thêm manager nếu thiếu
+                    const hasManager = users.find(u => u.username.toLowerCase() === 'manager');
+                    if (!hasManager) {
+                        users.push({ username: 'manager', password: 'manager123', role: 'manager' });
+                        localStorage.setItem('users', JSON.stringify(users));
+                        console.log('Đã thêm manager vào users:', users);
+                    }
+                    console.log('Loaded users:', users);
+                } catch (parseError) {
+                    console.error('Lỗi parse users:', parseError);
+                    // Reset nếu lỗi parse
                     users = [
                         { username: 'admin', password: '123456', role: 'admin' },
                         { username: 'manager', password: 'manager123', role: 'manager' }
                     ];
                     localStorage.setItem('users', JSON.stringify(users));
-                    console.log('Đã tạo users mặc định:', users);
-                } else {
-                    try {
-                        users = JSON.parse(usersData);
-                        // Kiểm tra và thêm manager nếu thiếu
-                        const hasManager = users.find(u => u.username.toLowerCase() === 'manager');
-                        if (!hasManager) {
-                            users.push({ username: 'manager', password: 'manager123', role: 'manager' });
-                            localStorage.setItem('users', JSON.stringify(users));
-                            console.log('Đã thêm manager vào users:', users);
-                        }
-                        console.log('Loaded users:', users);
-                    } catch (parseError) {
-                        console.error('Lỗi parse users:', parseError);
-                        // Reset nếu lỗi parse
-                        users = [
-                            { username: 'admin', password: '123456', role: 'admin' },
-                            { username: 'manager', password: 'manager123', role: 'manager' }
-                        ];
-                        localStorage.setItem('users', JSON.stringify(users));
-                    }
                 }
-                // Clear invalid class on input
-                function clearInvalid(inputId) {
-                    const input = document.getElementById(inputId);
-                    if (input) input.classList.remove('is-invalid');
-                }
-                // Event Đăng Nhập - Kiểm tra element tồn tại
-                const loginForm = document.getElementById('loginForm');
-                if (loginForm) {
-                    loginForm.addEventListener('submit', function(e) {
-                        e.preventDefault();
-                        const loginUsername = document.getElementById('loginUsername');
-                        const loginPassword = document.getElementById('loginPassword');
-                        if (!loginUsername || !loginPassword) return;
-                        const username = loginUsername.value.toLowerCase().trim();
-                        const password = loginPassword.value;
-                        console.log('Đang kiểm tra login:', username, password); // Debug log
-                        const user = users.find(u => u.username.toLowerCase() === username && u.password === password);
-                        console.log('User found:', user); // Debug log
-                        if (user) {
-                            currentUser = user.username;
-                            currentRole = user.role;
-                            localStorage.setItem('currentUser', username);
-                            localStorage.setItem('currentRole', currentRole);
-                           
-                            // Close modal and show main
-                            if (modalInstance) modalInstance.hide();
+            }
+            // Clear invalid class on input
+            function clearInvalid(inputId) {
+                const input = document.getElementById(inputId);
+                if (input) input.classList.remove('is-invalid');
+            }
+            // Event Đăng Nhập
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const loginUsername = document.getElementById('loginUsername');
+                    const loginPassword = document.getElementById('loginPassword');
+                    if (!loginUsername || !loginPassword) return;
+                    const username = loginUsername.value.toLowerCase().trim();
+                    const password = loginPassword.value;
+                    console.log('Đang kiểm tra login:', username, password);
+                    const user = users.find(u => u.username.toLowerCase() === username && u.password === password);
+                    console.log('User found:', user);
+                    if (user) {
+                        currentUser = user.username;
+                        currentRole = user.role;
+                        localStorage.setItem('currentUser', username);
+                        localStorage.setItem('currentRole', currentRole);
+                        
+                        // Close modal and show main
+                        const authModalEl = document.getElementById('authModal');
+                        const authModal = bootstrap.Modal.getInstance(authModalEl);
+                        if (authModal) authModal.hide();
+                        setTimeout(() => {
+                            const mainContent = document.getElementById('mainContent');
+                            if (mainContent) mainContent.style.display = 'block';
+                            document.body.classList.remove('modal-open');
+                            document.body.style.overflow = 'auto';
                             setTimeout(() => {
-                                if (modal) {
-                                    modal.classList.remove('show', 'd-block');
-                                    modal.style.display = 'none';
-                                    modal.style.background = 'none';
-                                }
-                                document.body.classList.remove('modal-open');
-                                document.body.style.overflow = 'auto';
-                                const mainContent = document.getElementById('mainContent');
-                                if (mainContent) mainContent.style.display = 'block';
-                               
-                                setTimeout(() => {
-                                    loadAllData();
-                                    updateUIForRole();
-                                    alert(`Đăng nhập thành công! Chào mừng ${currentUser} với vai trò ${currentRole.toUpperCase()}.`);
-                                }, 500);
-                            }, 300);
-                        } else {
-                            alert('Tên đăng nhập hoặc mật khẩu không đúng! (Thử: admin/123456 hoặc manager/manager123)');
-                            loginUsername.classList.add('is-invalid');
-                            loginPassword.classList.add('is-invalid');
-                        }
-                    });
-                }
-                // Event Đăng Ký - Kiểm tra element tồn tại
-                const registerForm = document.getElementById('registerForm');
-                if (registerForm) {
-                    registerForm.addEventListener('submit', function(e) {
-                        e.preventDefault();
-                        const regUsername = document.getElementById('regUsername');
-                        const regPassword = document.getElementById('regPassword');
-                        const regConfirmPassword = document.getElementById('regConfirmPassword');
-                        if (!regUsername || !regPassword || !regConfirmPassword) return;
-                        const username = regUsername.value.toLowerCase().trim();
-                        const password = regPassword.value;
-                        const confirmPassword = regConfirmPassword.value;
-                        // Validation
-                        if (users.find(u => u.username.toLowerCase() === username)) {
-                            alert('Tên đăng nhập đã tồn tại!');
-                            regUsername.classList.add('is-invalid');
-                            return;
-                        }
-                        if (password.length < 6) {
-                            alert('Mật khẩu phải ít nhất 6 ký tự!');
-                            regPassword.classList.add('is-invalid');
-                            return;
-                        }
-                        if (password !== confirmPassword) {
-                            alert('Mật khẩu xác nhận không khớp!');
-                            regConfirmPassword.classList.add('is-invalid');
-                            return;
-                        }
-                        // Tạo user mới
-                        users.push({ username, password, role: 'viewer' });
-                        localStorage.setItem('users', JSON.stringify(users));
-                        alert('Đăng ký thành công! Vai trò của bạn là "Người Xem". Bây giờ bạn có thể đăng nhập.');
-                        registerForm.reset();
-                        const loginTab = document.getElementById('login-tab');
-                        if (loginTab) loginTab.click();
-                        const loginUsername = document.getElementById('loginUsername');
-                        const loginPassword = document.getElementById('loginPassword');
-                        if (loginUsername) loginUsername.value = username;
-                        if (loginPassword) loginPassword.value = password;
-                    });
-                }
-                // Clear invalid on input
-                ['regUsername', 'regPassword', 'regConfirmPassword', 'loginUsername', 'loginPassword'].forEach(id => {
-                    const input = document.getElementById(id);
-                    if (input) input.addEventListener('input', () => clearInvalid(id));
+                                loadAllData();
+                                updateUIForRole();
+                                alert(`Đăng nhập thành công! Chào mừng ${currentUser} với vai trò ${currentRole.toUpperCase()}.`);
+                            }, 500);
+                        }, 300);
+                    } else {
+                        alert('Tên đăng nhập hoặc mật khẩu không đúng! (Thử: admin/123456 hoặc manager/manager123)');
+                        loginUsername.classList.add('is-invalid');
+                        loginPassword.classList.add('is-invalid');
+                    }
                 });
-                // Check nếu đã login - Sửa: Load data trước khi check session để tránh treo
-                let savedUser = null;
-                let savedRole = null;
-                try {
-                    savedUser = localStorage.getItem('currentUser');
-                    savedRole = localStorage.getItem('currentRole');
-                } catch (e) {
-                    console.error('Lỗi đọc session localStorage:', e);
-                }
-                if (savedUser && savedRole) {
-                    currentUser = savedUser;
-                    currentRole = savedRole;
-                    // Force hide modal và show main ngay
-                    if (modal) {
-                        modal.classList.remove('show', 'd-block', 'fade');
-                        modal.style.display = 'none';
-                        modal.style.background = 'none';
-                        const modalInstance = bootstrap.Modal.getInstance(modal);
-                        if (modalInstance) modalInstance.hide();
+            }
+            // Event Đăng Ký
+            const registerForm = document.getElementById('registerForm');
+            if (registerForm) {
+                registerForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const regUsername = document.getElementById('regUsername');
+                    const regPassword = document.getElementById('regPassword');
+                    const regConfirmPassword = document.getElementById('regConfirmPassword');
+                    if (!regUsername || !regPassword || !regConfirmPassword) return;
+                    const username = regUsername.value.toLowerCase().trim();
+                    const password = regPassword.value;
+                    const confirmPassword = regConfirmPassword.value;
+                    // Validation
+                    if (users.find(u => u.username.toLowerCase() === username)) {
+                        alert('Tên đăng nhập đã tồn tại!');
+                        regUsername.classList.add('is-invalid');
+                        return;
                     }
-                    document.body.classList.remove('modal-open');
-                    document.body.style.overflow = 'auto';
-                    const mainContent = document.getElementById('mainContent');
-                    if (mainContent) mainContent.style.display = 'block';
-                    setTimeout(() => {
-                        console.log('Loading saved session data...');
-                        loadAllData();
-                        updateUIForRole();
-                    }, 500);
-                } else {
-                    // Nếu chưa login, show modal
-                    if (modal) {
-                        modal.classList.add('show', 'd-block');
-                        modal.style.display = 'block';
-                        modal.style.background = 'rgba(0,0,0,0.5)';
-                        document.body.classList.add('modal-open');
-                        document.body.style.overflow = 'hidden';
+                    if (password.length < 6) {
+                        alert('Mật khẩu phải ít nhất 6 ký tự!');
+                        regPassword.classList.add('is-invalid');
+                        return;
                     }
-                }
-                // Dynamic load for tabs
-                const mainTabs = document.getElementById('mainTabs');
-                if (mainTabs) {
-                    const triggerTabList = mainTabs.querySelectorAll('button');
-                    triggerTabList.forEach(triggerEl => {
-                        const tabTrigger = new bootstrap.Tab(triggerEl);
-                        triggerEl.addEventListener('shown.bs.tab', function (e) {
-                            const targetTab = e.target.getAttribute('data-bs-target');
-                            if (targetTab === '#products') {
-                                loadProducts();
-                                updateStats();
-                            } else if (targetTab === '#transactions') {
-                                loadTransactions();
-                            } else if (targetTab === '#reports') {
-                                updateReportData();
-                            }
-                        });
-                    });
-                }
-            } catch (error) {
-                console.error('Lỗi DOMContentLoaded:', error);
-                // Fallback show main nếu lỗi
+                    if (password !== confirmPassword) {
+                        alert('Mật khẩu xác nhận không khớp!');
+                        regConfirmPassword.classList.add('is-invalid');
+                        return;
+                    }
+                    // Tạo user mới
+                    users.push({ username, password, role: 'viewer' });
+                    localStorage.setItem('users', JSON.stringify(users));
+                    alert('Đăng ký thành công! Vai trò của bạn là "Người Xem". Bây giờ bạn có thể đăng nhập.');
+                    registerForm.reset();
+                    const loginTab = document.getElementById('login-tab');
+                    if (loginTab) loginTab.click();
+                    const loginUsername = document.getElementById('loginUsername');
+                    const loginPassword = document.getElementById('loginPassword');
+                    if (loginUsername) loginUsername.value = username;
+                    if (loginPassword) loginPassword.value = password;
+                });
+            }
+            // Clear invalid on input
+            ['regUsername', 'regPassword', 'regConfirmPassword', 'loginUsername', 'loginPassword'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) input.addEventListener('input', () => clearInvalid(id));
+            });
+            // Check nếu đã login
+            let savedUser = null;
+            let savedRole = null;
+            try {
+                savedUser = localStorage.getItem('currentUser');
+                savedRole = localStorage.getItem('currentRole');
+            } catch (e) {
+                console.error('Lỗi đọc session localStorage:', e);
+            }
+            const authModalEl = document.getElementById('authModal');
+            if (savedUser && savedRole) {
+                currentUser = savedUser;
+                currentRole = savedRole;
+                // Show main ngay
                 const mainContent = document.getElementById('mainContent');
                 if (mainContent) mainContent.style.display = 'block';
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = 'auto';
+                setTimeout(() => {
+                    console.log('Loading saved session data...');
+                    loadAllData();
+                    updateUIForRole();
+                }, 500);
+                // Ẩn modal nếu đang show
+                if (authModalEl) {
+                    const authModal = bootstrap.Modal.getInstance(authModalEl);
+                    if (authModal) authModal.hide();
+                }
+            } else {
+                // Nếu chưa login, show modal
+                const authModal = new bootstrap.Modal(authModalEl);
+                authModal.show();
+            }
+            // Dynamic load for tabs
+            const mainTabs = document.getElementById('mainTabs');
+            if (mainTabs) {
+                const triggerTabList = mainTabs.querySelectorAll('button');
+                triggerTabList.forEach(triggerEl => {
+                    triggerEl.addEventListener('shown.bs.tab', function (e) {
+                        const targetTab = e.target.getAttribute('data-bs-target');
+                        if (targetTab === '#products') {
+                            loadProducts();
+                            updateStats();
+                        } else if (targetTab === '#transactions') {
+                            loadTransactions();
+                        } else if (targetTab === '#reports') {
+                            updateReportData();
+                        }
+                    });
+                });
             }
         });
         function logout() {
@@ -622,13 +621,10 @@
             currentUser = null;
             const mainContent = document.getElementById('mainContent');
             if (mainContent) mainContent.style.display = 'none';
-            const modal = document.getElementById('authModal');
-            if (modal) {
-                modal.classList.add('show', 'd-block');
-                modal.style.display = 'block';
-                modal.style.background = 'rgba(0,0,0,0.5)';
-                document.body.classList.add('modal-open');
-                document.body.style.overflow = 'hidden';
+            const authModalEl = document.getElementById('authModal');
+            if (authModalEl) {
+                const authModal = new bootstrap.Modal(authModalEl);
+                authModal.show();
             }
             const loginForm = document.getElementById('loginForm');
             const registerForm = document.getElementById('registerForm');
@@ -716,9 +712,15 @@
             }
         }
         // ===== SẢN PHẨM =====
-        function loadProducts(filter = null) {
-            console.log('loadProducts called');
-            filteredProducts = products.filter(p => !filter || getStatus(p.quantity) === filter);
+        function loadProducts() {
+            console.log('loadProducts called with searchQuery:', searchQuery, 'statusFilter:', statusFilter);
+            // Áp dụng search trước
+            let tempProducts = products.filter(p => 
+                p.code.toLowerCase().includes(searchQuery) || 
+                p.name.toLowerCase().includes(searchQuery)
+            );
+            // Sau đó áp dụng status filter
+            filteredProducts = tempProducts.filter(p => !statusFilter || getStatus(p.quantity) === statusFilter);
             const start = (currentPage - 1) * itemsPerPage;
             const pageProducts = filteredProducts.slice(start, start + itemsPerPage);
             const tbody = document.getElementById('productsBody');
@@ -748,48 +750,95 @@
             updateTransactionProductSelect();
         }
         function getStatus(qty) { return qty > 10 ? 'Đầy Đủ' : qty > 0 ? 'Ít' : 'Hết'; }
-        function searchProducts() {
+        function handleSearchInput() {
             const searchInput = document.getElementById('searchInput');
             if (!searchInput) return;
-            const query = searchInput.value.toLowerCase();
-            filteredProducts = products.filter(p => p.code.toLowerCase().includes(query) || p.name.toLowerCase().includes(query));
+            searchQuery = searchInput.value.toLowerCase().trim();
             currentPage = 1;
             loadProducts();
+            showSearchSuggestions(searchInput.value.toLowerCase());
+        }
+        function showSearchSuggestions(query) {
+            const dropdown = document.getElementById('searchDropdown');
+            if (!dropdown) return;
+            if (query.length < 1) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            const suggestions = products.filter(p => 
+                p.code.toLowerCase().includes(query) || 
+                p.name.toLowerCase().includes(query)
+            ).slice(0, 5); // Giới hạn 5 gợi ý
+            if (suggestions.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            let html = '';
+            suggestions.forEach(p => {
+                html += `<div class="dropdown-item" onclick="selectSuggestion('${p.id}')">${p.code} - ${p.name} (Tồn: ${p.quantity})</div>`;
+            });
+            dropdown.innerHTML = html;
+            dropdown.style.display = 'block';
+        }
+        function selectSuggestion(productId) {
+            const p = products.find(prod => prod.id === productId);
+            if (p) {
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    searchInput.value = p.name; // Hoặc p.code, tùy chọn
+                    searchQuery = searchInput.value.toLowerCase();
+                    loadProducts();
+                }
+            }
+            const dropdown = document.getElementById('searchDropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }
+        function clearSearch() {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.value = '';
+                searchQuery = '';
+                loadProducts();
+            }
+            const dropdown = document.getElementById('searchDropdown');
+            if (dropdown) dropdown.style.display = 'none';
         }
         function filterProducts() {
-            const filterStatus = document.getElementById('filterStatus');
-            if (!filterStatus) return;
-            const status = filterStatus.value;
-            loadProducts(status);
+            const filterStatusSelect = document.getElementById('filterStatus');
+            if (!filterStatusSelect) return;
+            statusFilter = filterStatusSelect.value;
+            currentPage = 1;
+            loadProducts();
         }
         function updatePagination(total) {
             const totalPages = Math.ceil(total / itemsPerPage);
             let html = '';
-            for (let i = 1; i <= totalPages; i++) {
-                html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changePage(${i}); event.preventDefault();">${i}</a></li>`;
+            if (totalPages > 0) {
+                for (let i = 1; i <= totalPages; i++) {
+                    html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a></li>`;
+                }
             }
             const pagination = document.getElementById('pagination');
             if (pagination) pagination.innerHTML = html;
         }
         function changePage(page) {
             currentPage = page;
-            const filterStatus = document.getElementById('filterStatus');
-            loadProducts(filterStatus ? filterStatus.value : null);
+            loadProducts();
         }
         function updateStats() {
-            const totalProducts = document.getElementById('totalProducts');
-            const totalValue = document.getElementById('totalValue');
-            const lowStock = document.getElementById('lowStock');
-            const outOfStock = document.getElementById('outOfStock');
-            if (!totalProducts || !totalValue || !lowStock || !outOfStock) return;
+            const totalProductsEl = document.getElementById('totalProducts');
+            const totalValueEl = document.getElementById('totalValue');
+            const lowStockEl = document.getElementById('lowStock');
+            const outOfStockEl = document.getElementById('outOfStock');
+            if (!totalProductsEl || !totalValueEl || !lowStockEl || !outOfStockEl) return;
             const total = products.length;
             const value = products.reduce((sum, p) => sum + (p.quantity * p.importPrice), 0);
             const low = products.filter(p => p.quantity > 0 && p.quantity <= 10).length;
             const out = products.filter(p => p.quantity === 0).length;
-            totalProducts.textContent = total;
-            totalValue.textContent = formatCurrency(value);
-            lowStock.textContent = low;
-            outOfStock.textContent = out;
+            totalProductsEl.textContent = total;
+            totalValueEl.textContent = formatCurrency(value);
+            lowStockEl.textContent = low;
+            outOfStockEl.textContent = out;
         }
         function formatCurrency(num) { return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ'; }
         function resetProductForm() {
@@ -962,7 +1011,7 @@
         // ===== BÁO CÁO =====
         function updateCharts() {
             console.log('updateCharts called');
-            // Biểu đồ cột tồn kho (sửa để hiển thị theo sản phẩm)
+            // Biểu đồ cột tồn kho
             const stockChartCanvas = document.getElementById('stockChart');
             if (stockChartCanvas) {
                 const ctx1 = stockChartCanvas.getContext('2d');
@@ -993,7 +1042,7 @@
                     }
                 });
             }
-            // Biểu đồ trạng thái (pie chart giữ nguyên)
+            // Biểu đồ trạng thái (pie chart)
             const statusChartCanvas = document.getElementById('statusChart');
             if (statusChartCanvas) {
                 const ctx2 = statusChartCanvas.getContext('2d');
@@ -1025,7 +1074,15 @@
                 alert('Đã xóa!');
             }
         }
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('searchDropdown');
+            const searchInput = document.getElementById('searchInput');
+            if (dropdown && !dropdown.contains(event.target) && !searchInput.contains(event.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>
-không sài được thanh tìm kiếm fix lại lỗi và viết lại toàn bộ code
+```
